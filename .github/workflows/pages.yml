@@ -1,0 +1,50 @@
+# Publishes skiLink to GitHub Pages and refreshes live lift/run status.
+# Runs on every push to main and every 15 minutes (GitHub may delay scheduled runs a little).
+name: Deploy site + live status
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch live lift & run status from the resorts
+        run: python tools/build_status.py
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r index.html sw.js manifest.webmanifest icon.svg icon-*.png data status _site/
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,8 @@
+# generated live status (built fresh by the GitHub Actions workflow)
+status/
+
+# local download logs, Python caches, editor/agent settings
+fetch*.log
+__pycache__/
+*.pyc
+.claude/

@@ -1,0 +1,1755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#2f7fdc">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PisteMap">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>PisteMap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --ink:#0f2742; --muted:#5f7690; --line:#dce8f3; --card:#ffffff; --ice:#f2f8fd; --ice2:#e2eef8; --frost:#c9def0;
+    --accent:#2b7de9; --accent-d:#1a5fc2; --route:#ff6b2c; --glass:rgba(255,255,255,.78);
+    --shadow:0 6px 24px rgba(23,64,117,.14); --shadow-s:0 2px 10px rgba(23,64,117,.07);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:#eaf3fa;color:var(--ink);font:14px/1.4 "Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  button,select{font:inherit;color:inherit;cursor:pointer}
+  #app{display:grid;grid-template-columns:1fr 400px;height:100vh;height:100dvh}
+  #mapWrap{position:relative;overflow:hidden}
+  #map{position:absolute;inset:0;background:#eef5fb}
+  /* wintry tint on the topo map */
+  #map.topo .leaflet-tile-pane{filter:saturate(.45) brightness(1.1) contrast(.92) hue-rotate(-8deg)}
+  #map.sat .leaflet-tile-pane{filter:saturate(.85) brightness(1.04)}
+  #snow{position:absolute;inset:0;pointer-events:none;z-index:650}
+  .frost-edge{position:absolute;inset:0;pointer-events:none;z-index:640;box-shadow:inset 0 0 90px rgba(225,240,252,.9)}
+
+  /* floating map UI: frosted glass */
+  .glass{background:var(--glass);backdrop-filter:blur(12px) saturate(1.3);-webkit-backdrop-filter:blur(12px) saturate(1.3);border:1px solid rgba(255,255,255,.9);box-shadow:var(--shadow)}
+  .topbar{position:absolute;top:14px;left:14px;right:14px;display:flex;gap:8px;align-items:center;pointer-events:none;flex-wrap:wrap;z-index:1000}
+  .topbar>*{pointer-events:auto}
+  .pillbtn{border-radius:999px;padding:9px 15px;font-weight:600;display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--ink)}
+  .pillbtn:hover{background:#fff}
+  .simctl{margin-left:auto;border-radius:999px;display:flex;align-items:center;padding:4px;gap:2px;font-size:12.5px}
+  .simctl span{padding:0 8px;color:var(--muted);font-weight:500}
+  .simctl button{border:0;background:none;padding:6px 11px;border-radius:999px;font-weight:700}
+  .simctl button.on{background:var(--ink);color:#fff}
+  .mapctl{position:absolute;right:14px;bottom:34px;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;z-index:1000}
+  .mapctl button{width:44px;height:44px;border:0;background:none;font-size:17px;display:grid;place-items:center;color:var(--ink);border-bottom:1px solid rgba(15,39,66,.07)}
+  .mapctl button:last-child{border-bottom:0}
+  .mapctl button:hover{background:rgba(255,255,255,.9)}
+  .mapctl button.on{background:var(--accent);color:#fff}
+  .mapctl svg{width:20px;height:20px}
+  .legend{position:absolute;left:14px;bottom:28px;border-radius:16px;padding:9px 12px;font-size:12px;display:grid;grid-template-columns:auto auto;gap:5px 14px;color:var(--muted);z-index:1000;font-weight:500}
+  .legend div{display:flex;align-items:center;gap:7px}
+  #toast{position:absolute;left:50%;top:76px;transform:translateX(-50%) translateY(-10px);background:rgba(15,39,66,.92);backdrop-filter:blur(8px);color:#fff;padding:11px 18px;border-radius:14px;font-weight:500;opacity:0;transition:.25s;pointer-events:none;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:1100}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #loading{position:absolute;inset:0;background:rgba(234,243,250,.6);backdrop-filter:blur(4px);display:none;place-items:center;z-index:1050}
+  #loading.show{display:grid}
+  .loadcard{border-radius:22px;padding:24px 30px;text-align:center;max-width:320px}
+  .flake-spin{font-size:34px;color:var(--accent);display:inline-block;animation:sp 2.4s linear infinite;margin-bottom:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #loadMsg{font-weight:700;font-size:15px}
+  #loadSub{color:var(--muted);font-size:12.5px;margin-top:4px}
+
+  /* friend markers: skier pins */
+  .sk{position:relative;width:44px;height:60px}
+  .sk .pinb{position:absolute;left:5px;top:16px;width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:#fff;border:3px solid var(--c);box-shadow:-2px 3px 8px rgba(15,39,66,.35)}
+  .sk .glyph{position:absolute;inset:0;display:grid;place-items:center;transform:rotate(45deg);color:var(--c)}
+  .sk .glyph svg{width:21px;height:21px;transition:transform .3s}
+  .sk .glyph.flip svg{transform:scaleX(-1)}
+  .sk .ring{position:absolute;inset:-8px;border-radius:50% 50% 50% 0;border:2.5px dashed var(--c);opacity:0;transition:opacity .2s}
+  .sk.sel .ring{opacity:1;animation:sp 8s linear infinite}
+  .sk .tag{position:absolute;left:50%;top:-6px;transform:translateX(-50%);background:var(--c);color:#fff;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap;box-shadow:0 2px 8px rgba(15,39,66,.3);border:1.5px solid rgba(255,255,255,.85);line-height:1.35}
+  .sk .tag .spd{font-weight:600;opacity:.92;margin-left:4px}
+  #map.far .sk .tag{display:none}
+  #map.far .sk.sel .tag{display:block}
+  .me{position:relative;width:24px;height:24px}
+  .me .dot{position:absolute;inset:0;background:var(--accent);border:4px solid #fff;border-radius:50%;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .me .halo{position:absolute;inset:-20px;background:var(--accent);border-radius:50%;animation:pulse 2.2s ease-out infinite}
+  .me .you{position:absolute;left:50%;top:-22px;transform:translateX(-50%);font-size:11px;font-weight:800;color:#fff;background:var(--accent);padding:1px 8px;border-radius:999px;border:1.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+  @keyframes pulse{0%{transform:scale(.3);opacity:.5}100%{transform:scale(1);opacity:0}}
+  .pin{width:30px;height:40px}
+  .lbl{white-space:nowrap;font-size:11.5px;font-weight:700;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;transform:translate(-50%,-50%);display:inline-block;pointer-events:none}
+  .lbl.lift{font-style:italic;color:#3d2a4f;font-weight:600}
+  .route-line{stroke-dasharray:12 8;animation:dash 1s linear infinite}
+  @keyframes dash{to{stroke-dashoffset:-20}}
+  .hl-line{animation:hl .8s ease-in-out infinite alternate}
+  @keyframes hl{from{opacity:.3}to{opacity:.95}}
+  .leaflet-tooltip{font:13px/1.35 "Outfit",system-ui,sans-serif;border-radius:10px;padding:6px 10px;border:0;box-shadow:var(--shadow)}
+  .leaflet-control-attribution{font-size:10px;background:rgba(255,255,255,.7)!important;border-radius:8px 0 0 0}
+
+  /* panel */
+  #panel{background:linear-gradient(180deg,#f8fcff 0%,#eef6fc 100%);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;position:relative;z-index:2}
+  .hero{position:relative;padding:18px 18px 46px;color:#fff;overflow:hidden;flex:none;
+    background:
+      radial-gradient(circle at 12% 22%,rgba(255,255,255,.55) 1.6px,transparent 2.4px),
+      radial-gradient(circle at 78% 18%,rgba(255,255,255,.5) 1.4px,transparent 2.2px),
+      radial-gradient(circle at 44% 40%,rgba(255,255,255,.4) 1.2px,transparent 2px),
+      radial-gradient(circle at 90% 52%,rgba(255,255,255,.45) 1.8px,transparent 2.6px),
+      radial-gradient(circle at 28% 62%,rgba(255,255,255,.35) 1.2px,transparent 2px),
+      linear-gradient(155deg,#1d4f9c 0%,#2f7fdc 45%,#69bdf5 85%,#a6dcfb 100%)}
+  .hero .mtn{position:absolute;left:0;bottom:-1px;width:100%;height:64px}
+  .brandrow{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.3px;font-size:13px;opacity:.95}
+  .brandrow .logo{width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.45);display:grid;place-items:center}
+  .brandrow .live{margin-left:auto;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:3px 9px;border-radius:999px;display:flex;align-items:center;gap:6px}
+  .brandrow .live i{width:7px;height:7px;border-radius:50%;background:#7dffb0;box-shadow:0 0 0 3px rgba(125,255,176,.25)}
+  .selwrap{position:relative;margin:10px 0 10px;display:inline-block;max-width:100%}
+  #resortSel{appearance:none;-webkit-appearance:none;background:transparent;border:0;color:#fff;font-size:26px;font-weight:800;letter-spacing:-.3px;padding:0 30px 0 0;max-width:100%;text-shadow:0 2px 12px rgba(10,40,90,.25);outline:none}
+  #resortSel option,#resortSel optgroup{color:var(--ink);font-size:15px;font-weight:500}
+  .selwrap::after{content:"";position:absolute;right:4px;top:50%;width:9px;height:9px;border-right:2.5px solid #fff;border-bottom:2.5px solid #fff;transform:translateY(-75%) rotate(45deg);pointer-events:none}
+  .conds{display:flex;gap:6px;flex-wrap:wrap;position:relative;z-index:1}
+  .conds span{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);padding:4px 10px;border-radius:999px;backdrop-filter:blur(6px)}
+  .conds svg{width:14px;height:14px}
+  .tabs{display:flex;margin:-22px 14px 4px;padding:5px;gap:4px;background:rgba(255,255,255,.85);border:1px solid #fff;border-radius:16px;box-shadow:var(--shadow);position:relative;z-index:2;backdrop-filter:blur(10px)}
+  .tabs button{flex:1;border:0;background:none;padding:9px 4px;font-weight:600;color:var(--muted);border-radius:11px}
+  .tabs button.on{color:#fff;background:linear-gradient(135deg,var(--accent),#4aa3f0);box-shadow:0 3px 10px rgba(43,125,233,.35)}
+  .content{flex:1;overflow:auto;padding:12px 14px 18px;min-height:0}
+  .section-title{font-size:11.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin:16px 4px 8px;display:flex;align-items:center;gap:6px}
+  .section-title:first-child{margin-top:6px}
+  .card{background:var(--card);border:1px solid #e6f0f8;border-radius:18px;padding:12px 14px;margin-bottom:10px;box-shadow:var(--shadow-s)}
+  .friend{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center;transition:.15s}
+  .friend.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,125,233,.15),var(--shadow-s)}
+  .avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px;flex:none;border:3px solid #fff;box-shadow:0 2px 8px rgba(15,39,66,.18);position:relative}
+  .avatar svg{width:22px;height:22px}
+  .avatar.sm{width:32px;height:32px}
+  .avatar.sm svg{width:17px;height:17px}
+  .name{font-weight:700;font-size:15px;display:flex;align-items:center;gap:6px}
+  .lvl{font-size:10.5px;font-weight:600;color:var(--accent-d);background:var(--ice2);border-radius:999px;padding:1px 8px}
+  .status{color:var(--muted);font-size:12.5px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .speed{text-align:right;line-height:1}
+  .speed b{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+  .speed small{display:block;color:var(--muted);font-size:10.5px;margin-top:3px;font-weight:500}
+  .actions{grid-column:1/-1;display:flex;gap:8px;margin-top:8px}
+  .btn{border:1px solid var(--line);background:var(--ice);border-radius:12px;padding:9px 13px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px;justify-content:center;transition:.15s}
+  .btn:hover{background:#fff}
+  .btn.route{background:linear-gradient(135deg,#ff8a4c,#ff5a1f);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(255,90,31,.28)}
+  .btn.route:hover{filter:brightness(1.05)}
+  .btn.grow{flex:1}
+  .hint{color:var(--muted);font-size:12.5px;padding:10px 12px;margin:0 0 6px;background:rgba(255,255,255,.6);border:1px dashed var(--frost);border-radius:14px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+  .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .lb-row{display:grid;grid-template-columns:28px auto 1fr auto;gap:10px;align-items:center;padding:10px 8px;border-bottom:1px solid #edf3f9}
+  .lb-row:last-child{border-bottom:0}
+  .lb-row.me{background:linear-gradient(90deg,#e8f2fe,#f4f9ff);border-radius:12px}
+  .rank{font-weight:800;color:var(--muted);text-align:center;font-size:15px}
+  .bar{height:6px;background:var(--ice2);border-radius:4px;margin-top:6px;overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:4px}
+  .lb-val{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;text-align:right}
+  .lb-val small{font-weight:500;color:var(--muted);font-size:11px;margin-left:2px}
+  .podium{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:8px;align-items:end;margin-bottom:12px}
+  .podium .p{background:#fff;border:1px solid #e6f0f8;border-radius:18px;padding:12px 6px 10px;text-align:center;box-shadow:var(--shadow-s)}
+  .podium .p.first{padding-top:16px;background:linear-gradient(180deg,#fffbea,#fff);border-color:#f6e3a1}
+  .podium .p .avatar{margin:0 auto 6px}
+  .podium .p b{display:block;font-size:17px;font-weight:800}
+  .podium .p span{font-size:12px;color:var(--muted)}
+  .podium .medal{font-size:18px;display:block;margin-bottom:4px}
+  .trail{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid #edf3f9;cursor:pointer;border-radius:10px}
+  .trail:last-child{border-bottom:0}
+  .trail:hover{background:var(--ice)}
+  .trail .t-name{flex:1;font-weight:600}
+  .trail .t-meta{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0}
+  .stats .card{margin:0;padding:12px 6px;text-align:center}
+  .stats b{display:block;font-size:21px;font-weight:800}
+  .stats span{font-size:11.5px;color:var(--muted)}
+  .back{border:0;background:none;font-weight:600;color:var(--accent);padding:4px 0;margin:4px 0 8px}
+  .route-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .route-head h2{margin:0;font-size:19px;font-weight:800}
+  .eta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .eta .card{margin:0;padding:11px 14px}
+  .eta .lab{font-size:11.5px;color:var(--muted);font-weight:600}
+  .eta .val{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+  .eta .card:first-child .val{color:var(--accent-d)}
+  .meetbox{background:linear-gradient(135deg,#fff4ea,#fffaf5);border:1px solid #ffd9b8;border-radius:14px;padding:10px 13px;margin-bottom:12px;font-size:13px}
+  .steps{list-style:none;margin:0 0 12px;padding:4px 12px;background:#fff;border:1px solid #e6f0f8;border-radius:18px;box-shadow:var(--shadow-s)}
+  .step{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;padding:9px 0;position:relative}
+  .step:not(:last-child)::after{content:"";position:absolute;left:14px;top:36px;bottom:-8px;width:2px;background:repeating-linear-gradient(180deg,var(--frost) 0 4px,transparent 4px 7px)}
+  .step .ic{width:30px;height:30px;border-radius:50%;background:var(--ice);border:1px solid var(--line);display:grid;place-items:center;z-index:1}
+  .step .ttl{font-weight:600}
+  .step .sub{color:var(--muted);font-size:12px}
+  .step .tm{color:var(--muted);font-weight:600;font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ropts{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+  .ropt{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;padding:12px 14px;border:1.5px solid #e3eef7;border-radius:18px;background:#fff;text-align:left;box-shadow:var(--shadow-s);transition:.15s;width:100%}
+  .ropt:hover{border-color:#cdb8f7}
+  .ropt.on{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.14),var(--shadow-s);background:linear-gradient(135deg,#faf7ff,#fff)}
+  .ropt .radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--frost);grid-row:span 3;align-self:start;margin-top:2px;transition:.15s}
+  .ropt.on .radio{border:5.5px solid #7c3aed}
+  .ropt .nm{font-weight:700;font-size:15px;display:block}
+  .ropt .hard{font-size:12px;color:var(--muted);display:inline-flex;align-items:center;gap:5px}
+  .ropt .tmw{text-align:right;line-height:1.1}
+  .ropt .tm{font-weight:800;font-size:19px;display:block;font-variant-numeric:tabular-nums}
+  .ropt .tmw small{font-size:11.5px;color:var(--muted);font-weight:600}
+  .ropt .tmw small.best{color:#7c3aed}
+  .ropt .mix{grid-column:2/-1;height:7px;border-radius:5px;overflow:hidden;display:flex;background:var(--ice2);gap:1.5px}
+  .ropt .mix i{height:100%}
+  .ropt .meta{grid-column:2/-1;font-size:12px;color:var(--muted)}
+  .stp{font-size:10.5px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;border-radius:6px;padding:2px 7px;margin-left:6px;white-space:nowrap}
+  .st-open{color:#15803d;background:#dcfce7}
+  .st-closed{color:#9f1239;background:#ffe4e6}
+  .st-sched{color:#92400e;background:#fef3c7}
+  .livecard{display:flex;gap:12px;align-items:flex-start}
+  .livecard b{font-size:14px}
+  .livecard a{color:var(--accent)}
+  .livecard .dot{width:12px;height:12px;border-radius:50%;margin-top:4px;flex:none;background:#cbd5e1}
+  .livecard .dot.on{background:#22c55e;box-shadow:0 0 0 4px rgba(34,197,94,.2);animation:livep 2s infinite}
+  .livecard .dot.wait{background:#f59e0b}
+  @keyframes livep{50%{box-shadow:0 0 0 7px rgba(34,197,94,.05)}}
+  .livedot{width:8px;height:8px;border-radius:50%;background:#fca5a5;display:inline-block}
+  .livedot.on{background:#7dffb0;box-shadow:0 0 0 3px rgba(125,255,176,.3)}
+  .err{background:#fff0f0;border:1px solid #ffd0d0;color:#9b1c1c;border-radius:14px;padding:12px;font-size:13px}
+  .src{color:var(--muted);font-size:11.5px;padding:8px 4px}
+
+  /* ---------- turn-by-turn banner (all sizes) ---------- */
+  #navBanner{position:absolute;top:calc(env(safe-area-inset-top) + 12px);left:12px;z-index:1002;display:none;width:min(440px,calc(100% - 24px));
+    border-radius:22px;padding:12px 14px;color:#fff;background:linear-gradient(135deg,#4c1d95,#7c3aed 70%,#8b5cf6);box-shadow:0 10px 30px rgba(76,29,149,.4)}
+  .navon #navBanner{display:block}
+  .nb-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+  .nb-ic{width:54px;height:54px;border-radius:16px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:26px}
+  .nb-ic svg{width:32px;height:32px;color:#fff}
+  .nb-main b{font-size:21px;font-weight:800;display:block;line-height:1.15}
+  .nb-main span{font-size:13.5px;opacity:.88}
+  .nb-eta{text-align:right;line-height:1.1}
+  .nb-eta b{font-size:24px;font-weight:800;display:block}
+  .nb-eta small{font-size:12px;opacity:.85}
+  .nb-next{margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.22);font-size:13.5px;display:flex;justify-content:space-between;gap:10px;opacity:.95}
+  .nb-next .ok{color:#86efac;font-weight:700}
+
+  /* ---------- phone layout: full-screen map + bottom sheet ---------- */
+  .grab,.quick{display:none}
+  body.mobile{overscroll-behavior:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  .mobile #app{display:block;position:fixed;inset:0}
+  .mobile #mapWrap{position:absolute;inset:0}
+  .mobile #panel{position:absolute;left:0;right:0;bottom:0;height:calc(100% - 84px - env(safe-area-inset-top));border:0;border-radius:26px 26px 0 0;
+    box-shadow:0 -10px 34px rgba(23,64,117,.22);transform:translateY(var(--sheet-y,60%));transition:transform .3s cubic-bezier(.2,.85,.25,1);z-index:1200;background:#f8fcff}
+  .mobile #panel.dragging{transition:none}
+  .mobile .grab{display:flex;justify-content:center;padding:10px 0 4px;touch-action:none;cursor:grab}
+  .grab i{width:46px;height:5px;border-radius:3px;background:#c3d3e4}
+  .mobile .quick{display:flex;gap:6px;overflow-x:auto;padding:6px 12px 10px;scrollbar-width:none;flex:none}
+  .quick::-webkit-scrollbar{display:none}
+  .qf{flex:none;width:68px;display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:4px 0;border-radius:16px}
+  .qf:active{background:var(--ice2)}
+  .qf .avatar{width:52px;height:52px;border-width:3px}
+  .qf .avatar svg{width:26px;height:26px}
+  .qf b{font-size:13px;font-weight:700;line-height:1.1}
+  .qf small{font-size:11.5px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+  .qf.sel .avatar{box-shadow:0 0 0 3px var(--accent)}
+  .mobile .tabs{margin:2px 12px 6px;touch-action:none}
+  .mobile .tabs button{padding:12px 4px;font-size:15px}
+  .mobile .content{padding:8px 14px calc(24px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+  /* resort header floats over the map */
+  .mobile .hero{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:10px;right:10px;z-index:1001;border-radius:22px;padding:10px 14px 11px;box-shadow:0 8px 26px rgba(23,64,117,.3)}
+  .mobile .hero .mtn,.mobile .hero .brandrow{display:none}
+  .mobile .selwrap{margin:0 0 7px}
+  .mobile #resortSel{font-size:21px}
+  .mobile .conds{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-14px;padding-right:14px}
+  .mobile .conds::-webkit-scrollbar{display:none}
+  .mobile .conds span{flex:none;font-size:13px}
+  .mobile.navon .hero{display:none}
+  .mobile #navBanner{left:10px;width:calc(100% - 20px)}
+  .mobile .topbar,.mobile .legend,.mobile #bSnow,.mobile #bMe{display:none}
+  .mobile .mapctl{right:10px;bottom:calc(var(--peek,180px) + 14px);border-radius:18px;transition:bottom .3s}
+  .mobile .mapctl button{width:52px;height:52px;font-size:19px}
+  .mobile .mapctl svg{width:23px;height:23px}
+  .mobile .leaflet-bottom{bottom:calc(var(--peek,180px) - 4px)}
+  .mobile .leaflet-control-attribution{font-size:8.5px;max-width:62vw;line-height:1.3}
+  .mobile #toast{top:auto;bottom:calc(var(--peek,180px) + 16px);font-size:15px}
+  .mobile #bSearch{display:grid}
+  #bSearch{display:none}
+  /* bigger, glove-friendly targets inside the sheet */
+  .mobile .btn{padding:13px 14px;font-size:15px;border-radius:14px}
+  .mobile .chip{padding:9px 14px;font-size:14px}
+  .mobile .name{font-size:16px}
+  .mobile .status{font-size:13.5px}
+  .mobile .ropt{padding:14px 16px}
+  .mobile .ropt .nm{font-size:16.5px}
+  .mobile .trail{padding:12px 6px}
+  .mobile .back{font-size:16px;padding:8px 0}
+  .democard{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .democard .seg{display:flex;background:var(--ice2);border-radius:999px;padding:3px}
+  .democard .seg button{border:0;background:none;padding:7px 13px;border-radius:999px;font-weight:700}
+  .democard .seg button.on{background:var(--ink);color:#fff}
+  @media (prefers-reduced-motion:reduce){#snow{display:none}.route-line,.me .halo,.sk.sel .ring{animation:none}}
+</style>
+</head>
+<body>
+<script>if (matchMedia('(max-width: 899px)').matches) document.body.classList.add('mobile');</script>
+<div id="app">
+  <div id="mapWrap">
+    <div id="map" class="topo"></div>
+    <div class="frost-edge"></div>
+    <canvas id="snow"></canvas>
+    <div class="topbar">
+      <button class="pillbtn glass" id="searchArea" title="Load runs & lifts in the visible map area">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>Search this area</button>
+      <div class="simctl glass" title="Simulation speed for the demo friends"><span>Sim speed</span>
+        <button data-sim="1">1×</button><button data-sim="5" class="on">5×</button><button data-sim="20">20×</button>
+      </div>
+    </div>
+    <div class="legend glass" id="legend"></div>
+    <div id="navBanner"></div>
+    <div class="mapctl glass">
+      <button id="bSearch" title="Load runs & lifts in the visible map area"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button>
+      <button id="bSnow" class="on" title="Toggle snowfall">❄</button>
+      <button id="bLayer" title="Toggle satellite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg></button>
+      <button id="bPlace" title="Set my location by tapping the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg></button>
+      <button id="bGps" title="Use my GPS location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button id="bMe" title="Center on me"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11 21 3l-8 18-2-8-8-2Z"/></svg></button>
+      <button id="bFit" title="Show whole resort"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+    </div>
+    <div id="loading"><div class="loadcard glass"><div class="flake-spin">❄</div><div id="loadMsg">Loading…</div><div id="loadSub"></div></div></div>
+    <div id="toast"></div>
+  </div>
+  <aside id="panel">
+    <div class="grab" id="grab"><i></i></div>
+    <div class="quick" id="quick"></div>
+    <div class="hero" id="hero">
+      <div class="brandrow"><span class="logo">▲</span>PisteMap<span class="live"><i></i>Live</span></div>
+      <div class="selwrap"><select id="resortSel" title="Choose resort"></select></div>
+      <div class="conds" id="conds"><span>Loading…</span></div>
+      <svg class="mtn" viewBox="0 0 400 64" preserveAspectRatio="none">
+        <path d="M0 64V40l38-18 22 10 46-28 34 22 30-12 40 26 48-30 36 20 40-14 26 10 40-8v66Z" fill="rgba(255,255,255,.35)"/>
+        <path d="m106 4 12 7-6 1-6-4-5 3 5-7Z M262 6l10 7-6 0-4-3-4 2 4-6Z" fill="rgba(255,255,255,.7)"/>
+        <path d="M0 64V50l52-14 28 9 44-17 40 20 42-16 44 18 46-14 40 12 32-6 32 6v16Z" fill="#f8fcff"/>
+      </svg>
+    </div>
+    <div class="tabs" id="tabs">
+      <button data-tab="friends" class="on">Friends</button>
+      <button data-tab="leaderboard">Leaderboard</button>
+      <button data-tab="trails">Trails &amp; Lifts</button>
+    </div>
+    <div class="content" id="content"></div>
+  </aside>
+</div>
+
+<script>
+/* =========================================================================
+   CONFIG
+   ========================================================================= */
+const RESORTS = [   // keep in sync with tools/fetch_resorts.py
+  {id:'zermatt',    name:'Zermatt – Cervinia',    country:'CH', region:'Alps', bbox:[45.900,7.600,46.030,7.800]},
+  {id:'stanton',    name:'St. Anton am Arlberg',  country:'AT', region:'Alps', bbox:[47.100,10.150,47.170,10.300]},
+  {id:'valthorens', name:'Val Thorens',           country:'FR', region:'Alps', bbox:[45.260,6.530,45.330,6.620]},
+  {id:'verbier',    name:'Verbier',               country:'CH', region:'Alps', bbox:[46.060,7.180,46.130,7.330]},
+  {id:'ischgl',     name:'Ischgl',                country:'AT', region:'Alps', bbox:[46.930,10.250,47.020,10.380]},
+  {id:'solden',     name:'Sölden',                country:'AT', region:'Alps', bbox:[46.900,10.880,46.990,11.030]},
+  {id:'kitzbuehel', name:'Kitzbühel',             country:'AT', region:'Alps', bbox:[47.380,12.300,47.460,12.420]},
+  {id:'courchevel', name:'Courchevel & Méribel',  country:'FR', region:'Alps', bbox:[45.360,6.540,45.440,6.670]},
+  {id:'jackson',    name:'Jackson Hole',          country:'US', region:'Rest of the world', bbox:[43.565,-110.885,43.615,-110.800]},
+  {id:'whistler',   name:'Whistler Blackcomb',    country:'CA', region:'Rest of the world', bbox:[50.030,-123.000,50.130,-122.850]},
+  {id:'vail',       name:'Vail',                  country:'US', region:'Rest of the world', bbox:[39.570,-106.450,39.650,-106.300]},
+  {id:'niseko',     name:'Niseko United',         country:'JP', region:'Rest of the world', bbox:[42.820,140.620,42.890,140.720]},
+];
+const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+
+// speed m/s, typical line in minutes
+const LIFT_TYPES = {
+  cable_car:{label:'Cable car', speed:8, wait:6}, gondola:{label:'Gondola', speed:5.5, wait:3},
+  mixed_lift:{label:'Chair/gondola', speed:5, wait:2.5}, chair_lift:{label:'Chairlift', speed:4, wait:2},
+  drag_lift:{label:'Drag lift', speed:3, wait:1}, 't-bar':{label:'T-bar', speed:3, wait:1}, 'j-bar':{label:'J-bar', speed:3, wait:1},
+  platter:{label:'Platter', speed:3, wait:1}, rope_tow:{label:'Rope tow', speed:2, wait:0.5}, magic_carpet:{label:'Magic carpet', speed:1, wait:0.5},
+  funicular:{label:'Funicular', speed:8, wait:5}, rack_railway:{label:'Mountain railway', speed:5, wait:8},
+};
+// OSM piste:difficulty -> internal rank
+const RANK = {novice:1, easy:2, intermediate:3, advanced:4, expert:5, freeride:5, extreme:5};
+// North America vs. Europe/rest-of-world colour conventions
+const SCHEMES = {
+  na: {1:{key:'green',label:'Easy',color:'#2a9d58'}, 2:{key:'green',label:'Easy',color:'#2a9d58'}, 3:{key:'blue',label:'Intermediate',color:'#1d6fe0'},
+       4:{key:'black',label:'Advanced',color:'#1b1f24'}, 5:{key:'double',label:'Expert',color:'#1b1f24',dash:'7 5'},
+       levels:[[2,'Easy only'],[3,'Up to blue'],[4,'Up to black'],[5,'Any terrain']]},
+  eu: {1:{key:'green',label:'Beginner',color:'#2a9d58'}, 2:{key:'blue',label:'Easy',color:'#1d6fe0'}, 3:{key:'red',label:'Intermediate',color:'#d62828'},
+       4:{key:'black',label:'Difficult',color:'#1b1f24'}, 5:{key:'free',label:'Freeride',color:'#e76f00',dash:'7 5'},
+       levels:[[2,'Up to blue'],[3,'Up to red'],[4,'Up to black'],[5,'Any terrain']]},
+};
+let SCHEME = SCHEMES.na;
+const style = rank => SCHEME[rank];
+
+/* =========================================================================
+   DATA LOADING
+   ========================================================================= */
+const overpassQuery = b => `[out:json][timeout:120];(way["piste:type"="downhill"](${b});way["aerialway"](${b});way["railway"="funicular"](${b});way["railway"]["rack"](${b}););out body geom;wr["landuse"="winter_sports"]["name"](${b});out tags center;`;
+// funiculars and cog railways (e.g. Zermatt's Sunnegga & Gornergrat) work like lifts
+function liftType(t){
+  if (LIFT_TYPES[t.aerialway]) return t.aerialway;
+  if (t.railway === 'funicular') return 'funicular';
+  if (t.railway && t.rack && t.rack !== 'no' && !['abandoned', 'disused', 'razed', 'construction', 'platform', 'station'].includes(t.railway)) return 'rack_railway';
+  return null;
+}
+const cacheGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const cacheSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+async function loadOSM(resort){
+  if (resort.id){
+    try { const r = await fetch(`data/${resort.id}.json`); if (r.ok) return r.json(); } catch {}
+  }
+  const key = 'pm-osm-' + resort.bbox.map(v => v.toFixed(3)).join(',');
+  const hit = cacheGet(key); if (hit) return hit;
+  setLoading('Downloading runs & lifts from OpenStreetMap…', 'Live query — can take up to a minute');
+  let lastErr;
+  for (const url of OVERPASS){
+    try {
+      const r = await fetch(url, {method:'POST', body:'data=' + encodeURIComponent(overpassQuery(resort.bbox.join(',')))});
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      const slim = {elements: j.elements.map(e => ({type:e.type, id:e.id, tags:e.tags || {}, nodes:e.nodes, geometry: e.geometry && e.geometry.map(p => [p.lat, p.lon])}))};
+      cacheSet(key, slim);
+      return slim;
+    } catch (e){ lastErr = e; }
+  }
+  throw lastErr;
+}
+
+async function loadElevations(points, cacheKey){
+  // Open-Meteo elevation API (Copernicus DEM, ~90 m), max 100 points per request
+  const cached = cacheGet(cacheKey) || {}, need = points.filter(p => cached[p.id] === undefined);
+  for (let i = 0; i < need.length; i += 100){
+    setLoading('Fetching terrain elevation…', `${Math.min(i + 100, need.length)} / ${need.length} points`);
+    const batch = need.slice(i, i + 100);
+    const url = `https://api.open-meteo.com/v1/elevation?latitude=${batch.map(p => p.lat.toFixed(5)).join(',')}&longitude=${batch.map(p => p.lon.toFixed(5)).join(',')}`;
+    let r = await fetch(url);
+    if (r.status === 429){   // free tier: per-minute limit — wait it out once
+      setLoading('Fetching terrain elevation…', 'Elevation service busy — retrying in a minute');
+      await new Promise(res => setTimeout(res, 61000)); r = await fetch(url);
+    }
+    if (!r.ok) throw new Error('elevation HTTP ' + r.status);
+    const j = await r.json();
+    batch.forEach((p, k) => cached[p.id] = j.elevation[k]);
+  }
+  cacheSet(cacheKey, cached);
+  return cached;
+}
+
+/* =========================================================================
+   GRAPH BUILDING
+   Every OSM run/lift way is split at junction nodes. Runs are directed
+   downhill, lifts uphill (checked against DEM elevation). Loose ends within
+   a few dozen metres of another way are joined with short "link" edges.
+   ========================================================================= */
+let G = null;
+
+function buildGraph(osm, bbox){
+  const lat0 = (bbox[0] + bbox[2]) / 2, lon0 = (bbox[1] + bbox[3]) / 2;
+  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
+  const xy = (lat, lon) => [(lon - lon0) * kx, (lat - lat0) * ky];
+  const coord = new Map(), ways = [], areas = [];
+
+  for (const e of osm.elements){
+    const t = e.tags || {};
+    if (e.type !== 'way' || !e.geometry){ if (t.landuse === 'winter_sports' && t.name) areas.push(t.name); continue; }
+    let kind = null;
+    const nm = t.name || '';
+    if (t.disused === 'yes' || t.abandoned === 'yes' || t.demolished === 'yes' || t['piste:abandoned'] === 'yes' ||
+        /stillgelegt|abgebaut|disused|abandoned|dismantled|désaffecté|dismesso/i.test(nm)) continue;   // decommissioned
+    if (t['piste:type'] === 'downhill' && !t.aerialway){
+      if (t.area === 'yes' || (e.nodes[0] === e.nodes[e.nodes.length-1] && e.nodes.length > 3)) continue; // piste areas
+      kind = 'run';
+    } else if (liftType(t)) kind = 'lift';
+    if (!kind || e.nodes.length < 2) continue;
+    e.nodes.forEach((id, i) => coord.set(id, e.geometry[i]));
+    ways.push({id:e.id, kind, tags:t, ltype: kind === 'lift' ? liftType(t) : null, nodes:e.nodes.slice(), name:t.name || t['piste:name'] || '',
+      rank: kind === 'run' ? (RANK[t['piste:difficulty']] || 3) : 0, unknownDiff: kind === 'run' && !RANK[t['piste:difficulty']]});
+  }
+  if (!ways.length) return null;
+
+  // count how many ways touch each node
+  const uses = new Map();
+  ways.forEach(w => new Set(w.nodes).forEach(id => uses.set(id, (uses.get(id) || 0) + 1)));
+  const split = new Set();
+  uses.forEach((n, id) => { if (n > 1) split.add(id); });
+  ways.forEach(w => { split.add(w.nodes[0]); split.add(w.nodes[w.nodes.length-1]); });
+
+  // snap loose ends to the nearest vertex of another way
+  const CELL = 70, grid = new Map(), cellKey = (x, y) => Math.floor(x / CELL) + ',' + Math.floor(y / CELL);
+  ways.forEach((w, wi) => w.nodes.forEach(id => {
+    const [lat, lon] = coord.get(id), [x, y] = xy(lat, lon), k = cellKey(x, y);
+    if (!grid.has(k)) grid.set(k, []); grid.get(k).push({id, wi, x, y});
+  }));
+  const links = [];
+  ways.forEach((w, wi) => [w.nodes[0], w.nodes[w.nodes.length-1]].forEach(end => {
+    if (uses.get(end) > 1) return;
+    const R = w.kind === 'lift' ? 70 : 40, [x, y] = xy(...coord.get(end));
+    let best = null, bd = R;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++){
+      for (const v of grid.get((Math.floor(x / CELL) + dx) + ',' + (Math.floor(y / CELL) + dy)) || []){
+        if (v.wi === wi) continue;
+        const d = Math.hypot(v.x - x, v.y - y);
+        if (d < bd){ bd = d; best = v; }
+      }
+    }
+    if (best){ split.add(best.id); links.push([end, best.id, bd]); }
+  }));
+
+  return {ways, coord, split, links, areas, xy, lat0, lon0};
+}
+
+function finishGraph(pre, ele){
+  const {ways, coord, split, links, xy} = pre;
+  const E = (id) => ele[id] ?? null;
+  const hasEle = Object.keys(ele).length > 0;
+
+  // orient each way: runs downhill, lifts uphill
+  ways.forEach(w => {
+    const a = E(w.nodes[0]), b = E(w.nodes[w.nodes.length-1]);
+    if (a == null || b == null) return;
+    if ((w.kind === 'run' && b - a > 15) || (w.kind === 'lift' && a - b > 15)){ w.nodes.reverse(); w.reversed = true; }
+  });
+
+  const edges = [], out = new Map(), inn = new Map(), nodes = new Map();
+  const addNode = id => { if (!nodes.has(id)){ const [lat, lon] = coord.get(id); nodes.set(id, {id, lat, lon, ele: E(id)}); } };
+  const addEdge = e => {
+    const pts = e.ids.map(id => coord.get(id)), cum = [0];
+    for (let i = 1; i < pts.length; i++){ const p = xy(...pts[i-1]), q = xy(...pts[i]); cum.push(cum[i-1] + Math.hypot(q[0]-p[0], q[1]-p[1])); }
+    const h = cum[cum.length-1]; if (h < 1) return;
+    const ea = E(e.from), eb = E(e.to);
+    const dz = ea != null && eb != null ? eb - ea : 0;
+    Object.assign(e, {pts, cum, h, eleA:ea, eleB:eb, length: Math.hypot(h, dz), vert: Math.max(0, -dz), slope: hasEle ? Math.max(0, -dz) / h : 0.2});
+    addNode(e.from); addNode(e.to);
+    e.idx = edges.length; edges.push(e);
+    if (!out.has(e.from)) out.set(e.from, []); out.get(e.from).push(e);
+    if (!inn.has(e.to)) inn.set(e.to, []); inn.get(e.to).push(e);
+  };
+
+  ways.forEach(w => {
+    const lt = LIFT_TYPES[w.ltype];
+    let speed = 0, wait = 0, label = '';
+    if (w.kind === 'lift'){
+      speed = lt.speed; wait = lt.wait; label = lt.label;
+      if (w.tags.aerialway === 'chair_lift'){ const det = w.tags['aerialway:detachable']; speed = det === 'no' ? 2.3 : det === 'yes' ? 5 : speed; }
+      w.duration = parseDuration(w.tags['aerialway:duration']);
+    }
+    let s = 0;
+    for (let i = 1; i < w.nodes.length; i++){
+      if (split.has(w.nodes[i]) || i === w.nodes.length - 1){
+        addEdge({kind:w.kind, way:w, wayId:w.id, name:w.name, rank:w.rank, from:w.nodes[s], to:w.nodes[i], ids:w.nodes.slice(s, i+1), speed, wait, typeLabel:label});
+        s = i;
+      }
+    }
+  });
+  // lift speed from the tagged ride duration when OSM has it
+  const liftLen = new Map();
+  edges.filter(e => e.kind === 'lift').forEach(e => liftLen.set(e.wayId, (liftLen.get(e.wayId) || 0) + e.length));
+  edges.filter(e => e.kind === 'lift' && e.way.duration).forEach(e => e.speed = Math.min(12, Math.max(1, liftLen.get(e.wayId) / e.way.duration)));
+  // short sections often look flat on a ~90 m elevation model: use the whole run's average steepness too
+  if (hasEle){
+    const agg = new Map();
+    edges.filter(e => e.kind === 'run').forEach(e => { const a = agg.get(e.wayId) || {h:0, v:0}; a.h += e.h; a.v += e.vert; agg.set(e.wayId, a); });
+    edges.filter(e => e.kind === 'run').forEach(e => { const a = agg.get(e.wayId); e.slope = Math.max(e.slope, 0.85 * a.v / Math.max(a.h, 1)); });
+  }
+  // enclosed lifts (cable cars, gondolas, funiculars, trains) can also be ridden down
+  const RIDE_DOWN = new Set(['cable_car', 'gondola', 'mixed_lift', 'funicular', 'rack_railway']);
+  edges.filter(e => e.kind === 'lift' && RIDE_DOWN.has(e.way.ltype)).forEach(e => {
+    addEdge({kind:'lift', down:true, way:e.way, wayId:e.wayId + '-down', name:e.name, rank:0, from:e.to, to:e.from,
+      ids:e.ids.slice().reverse(), speed:e.speed, wait:e.wait / 2, typeLabel:e.typeLabel});
+  });
+  links.forEach(([a, b, d]) => {
+    if (d < 1){ return; }
+    addEdge({kind:'link', from:a, to:b, ids:[a, b], name:'', rank:0});
+    addEdge({kind:'link', from:b, to:a, ids:[b, a], name:'', rank:0});
+  });
+
+  // Sectors that only meet in a village (e.g. Zermatt's valley stations) need a short walk.
+  // Join way endpoints of *different* components that are close and at a similar height.
+  const pre1 = largestSCC([...nodes.keys()], out, inn).comp;
+  const WR = 500, wgrid = new Map(), wk = (x, y) => Math.floor(x / WR) + ',' + Math.floor(y / WR);
+  const outDeg = id => (out.get(id) || []).length, inDeg = id => (inn.get(id) || []).length;
+  const deadEnd = new Set(), source = new Set();
+  nodes.forEach((n, id) => { if (!outDeg(id)) deadEnd.add(id); if (!inDeg(id)) source.add(id); });
+  const ends = [...new Set(ways.flatMap(w => [w.nodes[0], w.nodes[w.nodes.length-1]]))].filter(id => nodes.has(id))
+    .map(id => { const [x, y] = xy(...coord.get(id)); return {id, x, y}; });
+  ends.forEach(p => { const k = wk(p.x, p.y); if (!wgrid.has(k)) wgrid.set(k, []); wgrid.get(k).push(p); });
+  const walked = new Set();
+  // valley stations of different sectors are usually a short walk apart through the village
+  // and any two lift stations close together (e.g. funicular top → gondola bottom) are a quick transfer
+  const liftUp = edges.filter(e => e.kind === 'lift' && !e.down);
+  const valley = new Set(liftUp.map(e => e.from)), stations = new Set(liftUp.flatMap(e => [e.from, e.to]));
+  const VR = 1500, vlist = [...stations].map(id => { const [x, y] = xy(...coord.get(id)); return {id, x, y, valley: valley.has(id)}; });
+  vlist.forEach(p => vlist.forEach(q => {
+    if (p.id >= q.id || pre1.get(p.id) === pre1.get(q.id)) return;
+    const d = Math.hypot(q.x - p.x, q.y - p.y), za = E(p.id), zb = E(q.id);
+    const R = p.valley && q.valley ? VR : 200;
+    if (d > R || d < 1 || (za != null && zb != null && Math.abs(za - zb) > (R === VR ? 80 : 50))) return;
+    [[p.id, q.id], [q.id, p.id]].forEach(([a, b]) => { const k = a + '>' + b; if (!walked.has(k)){ walked.add(k); addEdge({kind:'link', walk:true, from:a, to:b, ids:[a, b], name:'', rank:0}); } });
+  }));
+  ends.forEach(p => {
+    if (!deadEnd.has(p.id) && !source.has(p.id)) return;   // only stranded ends need a walk
+    const bestBy = new Map();
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++){
+      for (const q of wgrid.get((Math.floor(p.x / WR) + dx) + ',' + (Math.floor(p.y / WR) + dy)) || []){
+        const c = pre1.get(q.id); if (c === pre1.get(p.id)) continue;
+        const d = Math.hypot(q.x - p.x, q.y - p.y); if (d > WR || d < 1) continue;
+        const za = E(p.id), zb = E(q.id); if (za != null && zb != null && Math.abs(za - zb) > 80) continue;
+        if (!bestBy.has(c) || bestBy.get(c).d > d) bestBy.set(c, {q, d});
+      }
+    }
+    bestBy.forEach(({q}) => {
+      const walk = (a, b) => { const k = a + '>' + b; if (walked.has(k)) return; walked.add(k);
+        addEdge({kind:'link', walk:true, from:a, to:b, ids:[a, b], name:'', rank:0}); };
+      if (deadEnd.has(p.id)) walk(p.id, q.id);   // run ends here → walk on
+      if (source.has(p.id)) walk(q.id, p.id);    // lift station nothing leads to → walk there
+    });
+  });
+
+  // keep the largest strongly-connected component for routing & simulation
+  const {comp, best} = largestSCC([...nodes.keys()], out, inn);
+  edges.forEach(e => { e.main = comp.get(e.from) === best && comp.get(e.to) === best; e.cost = edgeCost(e, 1); });
+  return {edges, out, inn, nodes, ways, hasEle, mainNodes: [...nodes.keys()].filter(id => comp.get(id) === best)};
+}
+
+function parseDuration(v){
+  if (!v) return 0;
+  let m;
+  if ((m = /^(\d+(?:\.\d+)?)$/.exec(v))) return +m[1] * 60;
+  if ((m = /^(\d+):(\d{1,2})$/.exec(v))) return +m[1] * 60 + +m[2];
+  if ((m = /^PT(?:(\d+)M)?(?:(\d+)S)?$/.exec(v))) return (+m[1] || 0) * 60 + (+m[2] || 0);
+  return 0;
+}
+
+function largestSCC(ids, out, inn){
+  const seen = new Set(), order = [];
+  for (const s of ids){
+    if (seen.has(s)) continue;
+    seen.add(s); const st = [[s, 0]];
+    while (st.length){
+      const top = st[st.length-1], es = out.get(top[0]) || [];
+      if (top[1] < es.length){ const t = es[top[1]++].to; if (!seen.has(t)){ seen.add(t); st.push([t, 0]); } }
+      else { order.push(top[0]); st.pop(); }
+    }
+  }
+  const comp = new Map(); let best = -1, bestSize = 0, c = 0;
+  for (let i = order.length - 1; i >= 0; i--){
+    const s = order[i]; if (comp.has(s)) continue;
+    let size = 0; const st = [s]; comp.set(s, c);
+    while (st.length){ const u = st.pop(); size++; for (const e of inn.get(u) || []) if (!comp.has(e.from)){ comp.set(e.from, c); st.push(e.from); } }
+    if (size > bestSize){ bestSize = size; best = c; }
+    c++;
+  }
+  return {comp, best};
+}
+
+/* =========================================================================
+   SPEEDS, ROUTING
+   ========================================================================= */
+// cruising speed on a run depends on its steepness (from DEM) and the skier
+function runSpeed(e, factor){ return Math.min(75, Math.max(12, 18 + 90 * Math.min(e.slope, 0.6))) * factor / 3.6; }
+function edgeCost(e, factor){
+  if (e.kind === 'lift') return e.length / e.speed + (e.wait || 0) * 60;
+  if (e.kind === 'link') return e.walk ? e.h / 1.2 + 30 : e.length / 2 + 5;
+  return e.length / runSpeed(e, factor);
+}
+function heapPush(h, x){ h.push(x); let i = h.length - 1; while (i){ const p = (i - 1) >> 1; if (h[p][0] <= h[i][0]) break; [h[p], h[i]] = [h[i], h[p]]; i = p; } }
+function heapPop(h){
+  const top = h[0], last = h.pop();
+  if (h.length){ h[0] = last; let i = 0; for (;;){ const l = 2*i+1, r = l+1; let m = i;
+    if (l < h.length && h[l][0] < h[m][0]) m = l; if (r < h.length && h[r][0] < h[m][0]) m = r;
+    if (m === i) break; [h[m], h[i]] = [h[i], h[m]]; i = m; } }
+  return top;
+}
+function dijkstra(start, goal, maxRank){
+  const dist = new Map([[start, 0]]), prev = new Map(), h = [[0, start]];
+  while (h.length){
+    const [d, u] = heapPop(h);
+    if (d > dist.get(u)) continue;
+    if (u === goal) break;
+    for (const e of G.out.get(u) || []){
+      if (!e.main || (e.kind === 'run' && e.rank > maxRank) || (e.shut && G.live && G.live.enforce)) continue;
+      const nd = d + e.cost;
+      if (nd < (dist.has(e.to) ? dist.get(e.to) : Infinity)){ dist.set(e.to, nd); prev.set(e.to, e); heapPush(h, [nd, e.to]); }
+    }
+  }
+  if (!dist.has(goal)) return null;
+  const edges = [];
+  for (let n = goal; n !== start; n = prev.get(n).from) edges.unshift(prev.get(n));
+  return {edges, time: dist.get(goal)};
+}
+
+function posAt(e, d){
+  const c = e.cum, hd = Math.max(0, Math.min(e.h, d * e.h / e.length));
+  let lo = 0, hi = c.length - 1;
+  while (hi - lo > 1){ const m = (lo + hi) >> 1; if (c[m] <= hd) lo = m; else hi = m; }
+  const t = (hd - c[lo]) / ((c[hi] - c[lo]) || 1), p = e.pts[lo], q = e.pts[hi];
+  return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
+}
+const eleAt = (e, d) => e.eleA == null ? null : e.eleA + (e.eleB - e.eleA) * Math.min(1, d / e.length);
+
+function nodeLabel(id){
+  const outs = G.out.get(id) || [], ins = G.inn.get(id) || [];
+  const lo = outs.find(e => e.kind === 'lift' && !e.down), li = ins.find(e => e.kind === 'lift' && !e.down);
+  if (lo) return `bottom of ${lo.name || lo.typeLabel}`;
+  if (li) return `top of ${li.name || li.typeLabel}`;
+  const names = [...new Set([...outs, ...ins].filter(e => e.kind === 'run' && e.name).map(e => e.name))];
+  if (names.length >= 2) return `${names[0]} / ${names[1]}`;
+  if (names.length === 1) return `on ${names[0]}`;
+  return 'trail junction';
+}
+const edgeName = e => e.kind === 'link' ? 'short traverse' : e.name || (e.kind === 'lift' ? 'unnamed ' + e.typeLabel.toLowerCase() : 'unnamed run');
+
+/* =========================================================================
+   SKIERS (simulated friends — the real app would stream GPS positions)
+   ========================================================================= */
+const mkStats = (top, vert, runs, km) => ({top, vert, runs, dist: km * 1000});
+const you = {id:'you', name:'You', initials:'ME', color:'#1a73e8', isYou:true, maxRank:5, factor:1, navQueue:[], stats:mkStats(66.1, 5320, 13, 17.4)};
+const friends = [
+  {id:'maya',  name:'Maya',  color:'#e4572e', maxRank:5, factor:1.15, stats:mkStats(78.4, 7420, 17, 21.3)},
+  {id:'leo',   name:'Leo',   color:'#7b2cbf', maxRank:4, factor:1.05, stats:mkStats(71.2, 6980, 15, 19.8)},
+  {id:'priya', name:'Priya', color:'#e09f3e', maxRank:5, factor:1.10, stats:mkStats(74.9, 5900, 14, 16.9)},
+  {id:'sam',   name:'Sam',   color:'#0a9396', maxRank:3, factor:0.92, stats:mkStats(58.3, 4870, 12, 15.2)},
+  {id:'jonah', name:'Jonah', color:'#3a86ff', maxRank:2, factor:0.78, stats:mkStats(39.5, 2210,  9,  8.6)},
+];
+friends.forEach(f => Object.assign(f, {initials: f.name.slice(0, 2).toUpperCase(), phase: Math.random() * 6}));
+const skiers = [you, ...friends];
+const byId = id => skiers.find(s => s.id === id);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+function placeSkiers(){
+  const main = G.edges.filter(e => e.main && e.kind !== 'link');
+  friends.forEach(f => {
+    const ok = main.filter(e => e.kind === 'lift' || e.rank <= f.maxRank);
+    const e = pick(ok.length ? ok : main);
+    Object.assign(f, {edge:e, node:e.from, d:Math.random() * e.length * 0.8, speed: e.kind === 'lift' ? e.speed : 8,
+      state: e.kind === 'lift' ? 'riding' : 'skiing', t: Math.random() * 100, burst: 0, holdAt: null, prevNode: null, lastWay: e.wayId});
+  });
+  // you start at the lowest lift station (usually the base area)
+  const bases = main.filter(e => e.kind === 'lift' && !e.down).sort((a, b) => (a.eleA ?? 0) - (b.eleA ?? 0));
+  Object.assign(you, {edge:null, node: bases.length ? bases[0].from : main[0].from, d:0, speed:0, state:'idle', t:0, burst:0, navQueue:[], lastWay:null});
+}
+
+function allowed(sk, e){ return (e.kind !== 'run' || e.rank <= sk.maxRank) && !(e.shut && G.live && G.live.enforce); }
+
+function startEdge(sk, e){
+  const boarding = e.kind === 'lift' && sk.lastWay !== e.wayId;
+  if (boarding && sk.lastKind === 'run') sk.stats.runs++;
+  sk.edge = e; sk.node = e.from; sk.d = 0; sk.lastWay = e.wayId; sk.lastKind = e.kind === 'link' ? sk.lastKind : e.kind;
+  if (e.kind === 'lift'){
+    if (boarding){ sk.state = 'queue'; sk.queueLeft = e.wait * 60 * (sk.isYou ? 0.6 : 0.3 + Math.random() * 0.8); sk.speed = 0; }
+    else sk.state = 'riding';
+  } else {
+    sk.state = 'skiing';
+    if (e.kind === 'run' && Math.random() < 0.1) sk.burst = Math.random() < 0.4 ? Math.random() * 0.3 : 0;
+  }
+}
+function chooseNext(sk){
+  let outs = (G.out.get(sk.node) || []).filter(e => e.main);
+  if (!outs.length){ // dead end: respawn at a lift
+    const lifts = G.edges.filter(e => e.main && e.kind === 'lift');
+    sk.node = pick(lifts).from; outs = G.out.get(sk.node).filter(e => e.main);
+  }
+  const ok = outs.filter(e => allowed(sk, e)), cand = ok.length ? ok : outs;
+  const w = cand.map(e => {
+    if (e.kind === 'link') return e.to === sk.prevNode ? 0.02 : 0.5;
+    if (e.kind === 'lift') return e.down ? 0.15 : e.wayId === sk.lastWay ? 5 : 1;
+    return (e.wayId === sk.lastWay ? 3 : 1) * (e.rank >= sk.maxRank - 1 ? 1.5 : 0.8);
+  });
+  let r = Math.random() * w.reduce((a, b) => a + b, 0), i = 0;
+  while ((r -= w[i]) > 0 && i < cand.length - 1) i++;
+  sk.prevNode = sk.node;
+  startEdge(sk, cand[i]);
+}
+
+function step(sk, dt){
+  sk.t += dt;
+  if (sk.state === 'idle' || sk.state === 'waiting'){ sk.speed = 0; return; }
+  if (sk.state === 'queue'){ sk.speed = 0; sk.queueLeft -= dt; if (sk.queueLeft <= 0) sk.state = 'riding'; return; }
+  const e = sk.edge;
+  if (e.kind === 'lift') sk.speed = e.speed;
+  else {
+    const target = e.kind === 'link' ? (e.walk ? 1.3 : 3) : runSpeed(e, sk.factor) * (0.82 + 0.18*Math.sin(sk.t*0.33 + sk.phase) + 0.1*Math.sin(sk.t*1.27 + sk.phase*2) + sk.burst);
+    sk.speed += (target - sk.speed) * Math.min(1, dt * 0.6);
+  }
+  const z0 = eleAt(e, sk.d);
+  sk.d += sk.speed * dt;
+  if (e.kind === 'run'){
+    sk.stats.dist += sk.speed * dt;
+    if (z0 != null) sk.stats.vert += Math.max(0, z0 - eleAt(e, sk.d));
+    sk.stats.top = Math.max(sk.stats.top, sk.speed * 3.6);
+  }
+  if (sk.d >= e.length) arrive(sk);
+}
+
+function arrive(sk){
+  const e = sk.edge;
+  sk.node = e.to; sk.edge = null; sk.d = 0;
+  if (sk.isYou){
+    if (sk.navQueue.length){ startEdge(sk, sk.navQueue.shift()); drawRoute(); }
+    else { sk.state = 'idle'; sk.speed = 0; drawRoute(); checkMeet(); }
+    return;
+  }
+  if (sk.holdAt === sk.node){ sk.state = 'waiting'; sk.speed = 0; checkMeet(); return; }
+  chooseNext(sk);
+}
+
+function remainingOnEdge(sk){
+  const e = sk.edge; if (!e) return 0;
+  if (e.kind === 'lift') return (sk.state === 'queue' ? sk.queueLeft : 0) + (e.length - sk.d) / e.speed;
+  return (e.length - sk.d) / (e.kind === 'link' ? (e.walk ? 1.2 : 2) : runSpeed(e, sk.factor));
+}
+
+/* =========================================================================
+   NAVIGATION TO A FRIEND
+   ========================================================================= */
+const ui = {tab:'friends', view:'tabs', routeFriend:null, route:null, nav:null, maxRank:5, lbMetric:'top', sim:5, selected:null, routeSig:'', placing:false};
+
+function planRoute(f){
+  const meet = f.state === 'waiting' ? f.node : (f.holdAt || (f.edge ? f.edge.to : f.node));
+  const friendEta = f.state === 'waiting' ? 0 : remainingOnEdge(f);
+  const start = you.edge ? you.edge.to : you.node, pre = remainingOnEdge(you);
+  // one candidate per difficulty limit: the fastest way using only runs up to that level
+  const options = [];
+  for (const [cap] of SCHEME.levels){
+    const r = dijkstra(start, meet, cap); if (!r) continue;
+    const sig = r.edges.map(e => e.idx).join();
+    const same = options.find(o => o.sig === sig);
+    if (same){ same.caps.push(cap); continue; }
+    const runs = r.edges.filter(e => e.kind === 'run');
+    const mix = {}; runs.forEach(e => mix[e.rank] = (mix[e.rank] || 0) + e.length);
+    options.push({sig, caps:[cap], edges:r.edges, time: pre + r.time, mix,
+      hardest: runs.reduce((a, e) => Math.max(a, e.rank), 0),
+      skiKm: runs.reduce((a, e) => a + e.length, 0) / 1000,
+      lifts: new Set(r.edges.filter(e => e.kind === 'lift').map(e => e.wayId)).size,
+      walk: r.edges.filter(e => e.walk).reduce((a, e) => a + e.h, 0)});
+  }
+  if (!options.length) return {error:true, meet, friendEta, start, options};
+  options.forEach((o, i) => {
+    o.name = options.length === 1 ? 'Best route' : i === 0 ? 'Easiest' : i === options.length - 1 ? 'Fastest'
+           : options.length === 3 ? 'Balanced' : `Balanced · ${style(o.hardest).label}`;
+    o.key = o.caps[o.caps.length - 1];
+  });
+  // keep the option the user picked (by difficulty limit); default = fastest
+  const pick = options.find(o => o.caps.includes(ui.maxRank)) || options.find(o => o.key > ui.maxRank) || options[options.length - 1];
+  return {meet, friendEta, start, options, pick, edges:pick.edges, time:pick.time, current: you.edge};
+}
+function openRoute(id){
+  if (ui.nav && id !== ui.nav.friend.id){ toast(`End navigation to ${ui.nav.friend.name} first`); id = ui.nav.friend.id; }
+  ui.view = 'route'; ui.routeFriend = byId(id); ui.selected = id; ui.routeSig = '';
+  if (!ui.nav) ui.route = planRoute(ui.routeFriend);
+  if (isMobile() && ui.sheet === 'peek') setSheet('half');
+  renderPanel(); drawRoute(); fitRoute();
+}
+function startNav(){
+  const f = ui.routeFriend, r = ui.route;
+  if (!r || r.error) return;
+  ui.nav = {friend:f, meet:r.meet, optName:r.pick.name, hardest:r.pick.hardest};
+  f.holdAt = r.meet;
+  you.navQueue = r.edges.slice();
+  if (!you.edge && you.navQueue.length) startEdge(you, you.navQueue.shift());
+  toast(`📍 Asked ${f.name} to wait for you at the ${nodeLabel(r.meet)}`);
+  askNotify().then(ok => { if (!ok) toast(`Tip: allow notifications to see your progress to ${f.name} from your lock screen`); updateBanner(); });
+  updateBanner(); setSheet('peek'); setTimeout(fitRoute, 350);
+  ui.routeSig = ''; renderPanel(); drawRoute(); checkMeet();
+}
+function stopNav(msg){
+  const f = ui.nav && ui.nav.friend;
+  if (f){ f.holdAt = null; if (f.state === 'waiting') setTimeout(() => { if (f.state === 'waiting' && !f.holdAt) chooseNext(f); }, 2500); }
+  ui.nav = null; you.navQueue = [];
+  endPresence(msg && msg.includes('met up') ? msg : null); updateBanner();
+  if (msg) toast(msg);
+  if (ui.routeFriend) ui.route = planRoute(ui.routeFriend);
+  ui.routeSig = ''; renderPanel(); drawRoute();
+}
+function checkMeet(){
+  const n = ui.nav; if (!n) return;
+  const f = n.friend;
+  if (!you.edge && you.node === n.meet && f.state === 'waiting' && f.node === n.meet) stopNav(`🎉 You met up with ${f.name} at the ${nodeLabel(n.meet)}!`);
+}
+
+/* =========================================================================
+   MAP
+   ========================================================================= */
+const map = L.map('map', {zoomControl:false, preferCanvas:true, attributionControl:true, zoomSnap:0.25, zoomDelta:0.5, wheelPxPerZoomLevel:90});
+const canvas = L.canvas({tolerance:8, padding:0.5}), svgR = L.svg({padding:0.5});
+const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom:17, maxNativeZoom:17, subdomains:'abc',
+  attribution:'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Style © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) | Elevation: Open-Meteo'}).addTo(map);
+const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18,
+  attribution:'Imagery © Esri, Maxar, Earthstar Geographics | Pistes © OpenStreetMap contributors | Elevation: Open-Meteo'});
+map.setView([43.59, -110.84], 13);
+const L_net = L.layerGroup().addTo(map), L_labels = L.layerGroup(), L_hl = L.layerGroup().addTo(map), L_route = L.layerGroup().addTo(map);
+
+function drawNetwork(){
+  L_net.clearLayers(); L_labels.clearLayers(); L_hl.clearLayers(); L_route.clearLayers();
+  const byWay = new Map();
+  G.edges.forEach(e => { if (e.kind !== 'link' && !e.down){ if (!byWay.has(e.wayId)) byWay.set(e.wayId, []); byWay.get(e.wayId).push(e); } });
+  const runs = [], lifts = [];
+  byWay.forEach(es => (es[0].kind === 'run' ? runs : lifts).push(es));
+  // easier runs drawn first so harder ones sit on top
+  runs.sort((a, b) => a[0].rank - b[0].rank).forEach(es => {
+    const e0 = es[0], s = style(e0.rank), lines = es.map(e => e.pts), st = e0.way.live, off = st === 'closed' || st === 'scheduled';
+    L.polyline(lines, {renderer:canvas, color:'#fff', weight:7, opacity:off ? .45 : .85, interactive:false}).addTo(L_net);
+    const len = es.reduce((a, e) => a + e.length, 0), vert = es.reduce((a, e) => a + e.vert, 0);
+    L.polyline(lines, {renderer:canvas, color:s.color, weight:off ? 2.5 : 3.5, opacity:off ? .35 : 1, dashArray:off ? '3 6' : s.dash})
+      .bindTooltip(`<b>${e0.name || 'Unnamed run'}</b> ${statusPill(st)}<br>${s.label}${e0.way.unknownDiff ? ' (difficulty not tagged)' : ''} · ${(len/1000).toFixed(1)} km${vert ? ` · ${Math.round(vert)} m ↓` : ''}`, {sticky:true})
+      .on('click', () => flashEdges(es)).addTo(L_net);
+  });
+  lifts.forEach(es => {
+    const e0 = es[0], lines = es.map(e => e.pts), len = es.reduce((a, e) => a + e.length, 0), st = e0.way.live, off = st === 'closed' || st === 'scheduled';
+    L.polyline(lines, {renderer:canvas, color:'#fff', weight:5, opacity:off ? .5 : .9, interactive:false}).addTo(L_net);
+    L.polyline(lines, {renderer:canvas, color:off ? '#9aa3ad' : st === 'open' ? '#0f7a3d' : '#20232a', weight:off ? 2 : 2.6, dashArray:off ? '4 5' : null})
+      .bindTooltip(`<b>${e0.name || e0.typeLabel}</b> ${statusPill(st)}<br>${e0.typeLabel} · ${(len/1000).toFixed(1)} km · ${Math.round(len / e0.speed / 60)} min ride`, {sticky:true})
+      .on('click', () => flashEdges(es)).addTo(L_net);
+    [es[0].pts[0], es[es.length-1].pts[es[es.length-1].pts.length-1]].forEach(p =>
+      L.circleMarker(p, {renderer:canvas, radius:3.5, color:'#20232a', weight:2, fillColor:'#fff', fillOpacity:1, interactive:false}).addTo(L_net));
+  });
+  // one label per run/lift name, at the midpoint of its longest way
+  const best = new Map();
+  byWay.forEach(es => { const n = es[0].name; if (!n) return; const len = es.reduce((a, e) => a + e.h, 0);
+    const k = es[0].kind + n; if (!best.has(k) || best.get(k).len < len) best.set(k, {es, len}); });
+  best.forEach(({es, len}) => {
+    if (len < 250) return;
+    let acc = 0, mid = es[0];
+    for (const e of es){ if (acc + e.h >= len / 2){ mid = e; break; } acc += e.h; }
+    const p = posAt(mid, (len / 2 - acc) * mid.length / mid.h), lift = mid.kind === 'lift';
+    L.marker(p, {interactive:false, icon:L.divIcon({className:'', iconSize:[0,0],
+      html:`<span class="lbl${lift ? ' lift' : ''}" style="${lift ? '' : 'color:' + style(mid.rank).color}">${mid.name}</span>`})}).addTo(L_labels);
+  });
+  updateLabels();
+}
+function updateLabels(){
+  if (map.getZoom() >= 15) L_labels.addTo(map); else L_labels.remove();
+  document.getElementById('map').classList.toggle('far', map.getZoom() < 13.5);   // hide name tags when zoomed out
+}
+map.on('zoomend', updateLabels);
+
+// little pictograms used for friends on the map and in the panel
+const GLYPH = {
+  ski:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="16.4" cy="3.9" r="2.4" fill="currentColor" stroke="none"/><path d="M14.8 7.3 10.2 10.9l3.6 3-2.6 4.6"/><path d="m14.8 7.3 3.3 3.5 1.6-.3"/><path d="M10.2 10.9 6.7 9.7 4.6 16"/><path d="m2.6 16.4 17.8 4.2"/></svg>`,
+  stand: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2.4" fill="currentColor" stroke="none"/><path d="M12 7.5v6.5l-3 6M12 14l3 6M7.5 11 12 9l4.5 2"/><path d="M4.5 21h15"/></svg>`,
+  lift:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 5 22 2.5M12 3.8V9"/><path d="M6.5 9h11v5.5h-11z"/><path d="M8.5 14.5v4.5M15.5 14.5v4.5"/></svg>`,
+};
+function glyphFor(sk){ return sk.state === 'skiing' ? 'ski' : sk.state === 'riding' || sk.state === 'queue' ? 'lift' : 'stand'; }
+
+function makeMarkers(){
+  skiers.forEach(sk => {
+    if (sk.marker) return;
+    const html = sk.isYou ? `<div class="me"><div class="halo"></div><div class="dot"></div><div class="you">You</div></div>`
+      : `<div class="sk" style="--c:${sk.color}"><div class="pinb"><div class="ring"></div><div class="glyph">${GLYPH.ski}</div></div><div class="tag"><span>${sk.name}</span><span class="spd"></span></div></div>`;
+    const icon = sk.isYou ? L.divIcon({className:'', html, iconSize:[24, 24], iconAnchor:[12, 12]})
+                          : L.divIcon({className:'', html, iconSize:[44, 60], iconAnchor:[22, 58]});
+    sk.marker = L.marker([0, 0], {icon, zIndexOffset: sk.isYou ? 1000 : 500})
+      .on('click', () => { if (sk.isYou) toast(statusPlain(you)); else { ui.tab = 'friends'; openRoute(sk.id); } })
+      .addTo(map);
+    const el = sk.marker.getElement();
+    sk.spdEl = el.querySelector('.spd'); sk.skEl = el.querySelector('.sk'); sk.glyphEl = el.querySelector('.glyph'); sk.glyphKind = 'ski';
+  });
+}
+function skierPos(sk){
+  if (sk.edge && sk.state !== 'queue') return posAt(sk.edge, sk.d);
+  if (sk.edge) return sk.edge.pts[0];
+  const n = G.nodes.get(sk.node); return [n.lat, n.lon];
+}
+function skierEle(sk){
+  if (sk.edge) return eleAt(sk.edge, sk.state === 'queue' ? 0 : sk.d);
+  return G.nodes.get(sk.node).ele;
+}
+function updateMarkers(){
+  skiers.forEach(sk => {
+    const p = skierPos(sk), dLon = sk.lon == null ? 0 : p[1] - sk.lon;
+    sk.lat = p[0]; sk.lon = p[1];
+    sk.marker.setLatLng(p);
+    if (!sk.isYou){
+      const moving = sk.state === 'skiing' && sk.speed > 1;
+      sk.spdEl.textContent = moving ? '· ' + Math.round(sk.speed * 3.6) + ' km/h' : sk.state === 'waiting' ? '· waiting' : '';
+      sk.skEl.classList.toggle('sel', ui.selected === sk.id);
+      const g = glyphFor(sk);
+      if (g !== sk.glyphKind){ sk.glyphKind = g; sk.glyphEl.innerHTML = GLYPH[g]; }
+      if (Math.abs(dLon) > 1e-7) sk.glyphEl.classList.toggle('flip', dLon < 0);   // face the direction of travel
+    }
+  });
+}
+
+function drawRoute(){
+  L_route.clearLayers();
+  let edges = [], meet = null;
+  if (ui.nav){ edges = (you.edge ? [you.edge] : []).concat(you.navQueue); meet = ui.nav.meet; }
+  else if (ui.view === 'route' && ui.route && !ui.route.error){
+    edges = (ui.route.current ? [ui.route.current] : []).concat(ui.route.edges); meet = ui.route.meet;
+    // the other options, faint and tappable
+    ui.route.options.filter(o => o !== ui.route.pick).forEach(o => {
+      const lines = o.edges.map(e => e.pts);
+      L.polyline(lines, {renderer:svgR, color:'#fff', weight:8, opacity:.7, lineCap:'round', interactive:false}).addTo(L_route);
+      L.polyline(lines, {renderer:svgR, color:'#7c3aed', weight:4.5, opacity:.4, dashArray:'2 7', lineCap:'round'})
+        .bindTooltip(`<b>${o.name}</b> · ${fmtT(o.time)}${o.hardest ? ' · hardest: ' + style(o.hardest).label : ''}<br><small>Tap to choose this route</small>`, {sticky:true})
+        .on('click', ev => { L.DomEvent.stop(ev); pickOption(o.key); }).addTo(L_route);
+    });
+  }
+  if (edges.length){
+    const lines = edges.map(e => e.pts);
+    L.polyline(lines, {renderer:svgR, color:'#fff', weight:11, opacity:.95, interactive:false, lineCap:'round'}).addTo(L_route);
+    L.polyline(lines, {renderer:svgR, color:'#7c3aed', weight:5.5, interactive:false, className:'route-line', lineCap:'round'}).addTo(L_route);
+  }
+  if (meet != null){
+    const n = G.nodes.get(meet);
+    L.marker([n.lat, n.lon], {interactive:false, zIndexOffset:900, icon:L.divIcon({className:'', iconSize:[30,40], iconAnchor:[15,40],
+      html:`<svg class="pin" viewBox="0 0 30 40"><path d="M15 39C11 29 2 24 2 14a13 13 0 0 1 26 0c0 10-9 15-13 25Z" fill="#7c3aed" stroke="#fff" stroke-width="2.5"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>`})}).addTo(L_route);
+  }
+}
+function flashEdges(es){
+  L_hl.clearLayers();
+  L.polyline(es.map(e => e.pts), {renderer:svgR, color:'#ffd166', weight:13, className:'hl-line', interactive:false}).addTo(L_hl);
+  clearTimeout(flashEdges.t); flashEdges.t = setTimeout(() => L_hl.clearLayers(), 3500);
+  map.flyToBounds(L.latLngBounds(es.flatMap(e => e.pts)), {...mapPad(), maxZoom:16, duration:0.6});
+}
+function fitResort(){
+  const b = L.latLngBounds(G.edges.filter(e => e.main).flatMap(e => [e.pts[0], e.pts[e.pts.length-1]]));
+  if (b.isValid()) map.fitBounds(b, isMobile() ? mapPad() : {padding:[30, 30]});
+}
+function fitRoute(){
+  const pts = [[you.lat, you.lon]];
+  if (ui.routeFriend) pts.push([ui.routeFriend.lat, ui.routeFriend.lon]);
+  if (ui.route && !ui.route.error) ui.route.edges.forEach(e => pts.push(...e.pts));
+  map.flyToBounds(L.latLngBounds(pts.filter(p => p[0] != null)), {...mapPad(), maxZoom:16, duration:0.6});
+}
+function nearestMainNode(lat, lon){
+  let best = null, bd = Infinity;
+  const kx = Math.cos(lat * Math.PI / 180);
+  for (const id of G.mainNodes){ const n = G.nodes.get(id), d = ((n.lat - lat) ** 2 + ((n.lon - lon) * kx) ** 2); if (d < bd){ bd = d; best = id; } }
+  return {id: best, meters: Math.sqrt(bd) * 111000};
+}
+function moveYouTo(id, msg){
+  if (ui.nav){ toast('End navigation first to move your position'); return; }
+  Object.assign(you, {edge:null, node:id, state:'idle', speed:0, navQueue:[]});
+  toast(msg || `You're at the ${nodeLabel(id)}`);
+  if (ui.view === 'route' && ui.routeFriend){ ui.route = planRoute(ui.routeFriend); ui.routeSig = ''; renderPanel(); drawRoute(); }
+}
+map.on('click', e => {
+  if (!ui.placing || !G) return;
+  ui.placing = false; document.getElementById('bPlace').classList.remove('on');
+  moveYouTo(nearestMainNode(e.latlng.lat, e.latlng.lng).id);
+});
+
+/* =========================================================================
+   PANEL UI
+   ========================================================================= */
+const content = document.getElementById('content');
+const fmtT = s => s < 60 ? `${Math.max(0, Math.round(s))} s` : s < 3600 ? `${Math.round(s/60)} min` : `${Math.floor(s/3600)} h ${Math.round(s%3600/60)} min`;
+const fmtKm = m => m < 1000 ? `${Math.round(m)} m` : `${(m/1000).toFixed(1)} km`;
+function diffIcon(rank, s = 14){
+  const st = style(rank), c = st.color;
+  if (st.key === 'green') return `<svg width="${s}" height="${s}" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="${c}"/></svg>`;
+  if (st.key === 'blue' && SCHEME === SCHEMES.na) return `<svg width="${s}" height="${s}" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" fill="${c}"/></svg>`;
+  if (st.key === 'black' && SCHEME === SCHEMES.na) return `<svg width="${s}" height="${s}" viewBox="0 0 14 14"><path d="M7 1 13 7 7 13 1 7Z" fill="${c}"/></svg>`;
+  if (st.key === 'double') return `<svg width="${s*1.6}" height="${s}" viewBox="0 0 22 14"><path d="M6 2 10 7 6 12 2 7Z M16 2 20 7 16 12 12 7Z" fill="${c}"/></svg>`;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="${c}"/></svg>`;   // EU: coloured dot
+}
+const liftIcon = (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="#3b3f45" stroke-width="1.6" stroke-linecap="round"><path d="M1 3 15 1"/><path d="M8 2v5"/><path d="M4 7h8v4H4z"/><path d="M4 11v3M12 11v3"/></svg>`;
+const avatar = (sk, sm) => `<div class="avatar${sm ? ' sm' : ''}" style="background:${sk.color}" title="${sk.name}">${sk.isYou ? sk.initials : GLYPH.ski}</div>`;
+
+function statusHTML(sk){
+  if (sk.state === 'waiting') return `⏳ Waiting for you at the ${nodeLabel(sk.node)}`;
+  if (sk.state === 'idle') return `📍 At the ${nodeLabel(sk.node)}`;
+  const e = sk.edge;
+  if (sk.state === 'queue') return `${liftIcon(12)} In line for ${edgeName(e)}`;
+  if (sk.state === 'riding') return `${liftIcon(12)} Riding ${edgeName(e)}`;
+  if (e.kind === 'link') return e.walk ? `🚶 Walking to the next lift` : `⛷ Traversing`;
+  return `${diffIcon(e.rank, 11)} Skiing ${edgeName(e)}`;
+}
+const statusPlain = sk => statusHTML(sk).replace(/<svg[\s\S]*?<\/svg>/g, '').trim();
+const eleText = sk => { const z = skierEle(sk); return z == null ? '' : ` · ${Math.round(z).toLocaleString()} m`; };
+
+function renderPanel(){
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab && ui.view === 'tabs'));
+  if (!G){ content.innerHTML = ''; return; }
+  if (ui.view === 'route') return renderRoute();
+  if (ui.tab === 'friends') renderFriends();
+  else if (ui.tab === 'leaderboard') renderLeaderboard();
+  else renderTrails();
+}
+
+function renderFriends(){
+  content.innerHTML = `
+    <div class="section-title">You</div>
+    <div class="card friend" data-row="you">${avatar(you)}
+      <div><div class="name">You</div><div class="status" data-f="status"></div></div>
+      <div class="speed"><b data-f="speed">0</b><small>km/h</small></div></div>
+    <p class="hint">Tap ⌖ to use your GPS when you're at the resort, or 📍 then tap the map to place yourself. Tap any friend to get routes to them.</p>
+    <div class="section-title">Friends on the mountain · ${friends.length}</div>
+    ${friends.map(f => `
+      <div class="card friend" data-row="${f.id}">${avatar(f)}
+        <div><div class="name">${f.name} <span class="lvl">${style(f.maxRank).label}</span></div><div class="status" data-f="status"></div></div>
+        <div class="speed"><b data-f="speed">0</b><small>km/h</small></div>
+        <div class="actions">
+          <button class="btn route grow" data-action="route" data-id="${f.id}">➜ Route to ${f.name}</button>
+          <button class="btn" data-action="locate" data-id="${f.id}">◎ Locate</button>
+        </div></div>`).join('')}
+    <div class="card democard"><div><b>Demo speed</b><div class="status">Friends are simulated</div></div>
+      <div class="seg">${[1, 5, 20].map(v => `<button data-action="sim" data-v="${v}" class="${ui.sim === v ? 'on' : ''}">${v}×</button>`).join('')}</div></div>`;
+  updateFriends();
+}
+function updateFriends(){
+  skiers.forEach(sk => {
+    const row = content.querySelector(`[data-row="${sk.id}"]`); if (!row) return;
+    row.classList.toggle('sel', ui.selected === sk.id);
+    const st = statusHTML(sk) + eleText(sk), sEl = row.querySelector('[data-f=status]');
+    if (sEl.innerHTML !== st) sEl.innerHTML = st;
+    row.querySelector('[data-f=speed]').textContent = Math.round(sk.speed * 3.6);
+  });
+}
+
+const METRICS = {
+  top:  {label:'Top speed', unit:'km/h', get: s => s.stats.top, fmt: v => v.toFixed(1)},
+  vert: {label:'Vertical',  unit:'m',    get: s => s.stats.vert, fmt: v => Math.round(v).toLocaleString()},
+  runs: {label:'Runs',      unit:'',     get: s => s.stats.runs, fmt: v => v},
+  dist: {label:'Distance',  unit:'km',   get: s => s.stats.dist / 1000, fmt: v => v.toFixed(1)},
+};
+function renderLeaderboard(){
+  content.innerHTML = `
+    <div class="chips">${Object.entries(METRICS).map(([k, m]) => `<button class="chip${ui.lbMetric === k ? ' on' : ''}" data-action="metric" data-m="${k}">${m.label}</button>`).join('')}</div>
+    <div class="podium" id="podium"></div>
+    <div class="section-title">Today · live</div>
+    <div class="card" id="lbList" style="padding:6px"></div>`;
+  updateLeaderboard();
+}
+function updateLeaderboard(){
+  const list = document.getElementById('lbList'); if (!list) return;
+  const m = METRICS[ui.lbMetric], rows = skiers.slice().sort((a, b) => m.get(b) - m.get(a)), max = m.get(rows[0]) || 1;
+  const pod = (s, i) => `<div class="p${i === 0 ? ' first' : ''}"><span class="medal">${['🥇','🥈','🥉'][i]}</span>${avatar(s)}<b>${m.fmt(m.get(s))}<small style="font-size:11px;font-weight:500;color:var(--muted)"> ${m.unit}</small></b><span>${s.name}</span></div>`;
+  document.getElementById('podium').innerHTML = pod(rows[1], 1) + pod(rows[0], 0) + pod(rows[2], 2);
+  list.innerHTML = rows.map((s, i) => `
+    <div class="lb-row${s.isYou ? ' me' : ''}"><div class="rank">${i < 3 ? ['🥇','🥈','🥉'][i] : i + 1}</div>${avatar(s, true)}
+      <div><div class="name">${s.name}</div><div class="bar"><i style="width:${(m.get(s) / max * 100).toFixed(1)}%;background:${s.color}"></i></div></div>
+      <div class="lb-val">${m.fmt(m.get(s))}<small>${m.unit}</small></div></div>`).join('');
+}
+
+function trailGroups(){
+  const groups = new Map();
+  G.edges.forEach(e => {
+    if (e.kind === 'link' || e.down) return;
+    const k = e.kind + '|' + (e.name || '#' + e.wayId) + '|' + e.rank;
+    if (!groups.has(k)) groups.set(k, {kind:e.kind, name:e.name, rank:e.rank, typeLabel:e.typeLabel, edges:[], len:0, vert:0, speed:e.speed});
+    const g = groups.get(k); g.edges.push(e); g.len += e.length; g.vert += e.vert;
+  });
+  return [...groups.values()];
+}
+function groupStatus(g){
+  const sts = g.edges.map(e => e.way.live).filter(Boolean);
+  return sts.includes('open') ? 'open' : sts.includes('scheduled') ? 'scheduled' : sts.length ? 'closed' : null;
+}
+function renderTrails(){
+  const gs = trailGroups(), lifts = gs.filter(g => g.kind === 'lift'), runs = gs.filter(g => g.kind === 'run');
+  const named = runs.filter(g => g.name), unnamed = runs.length - named.length;
+  const totalKm = runs.reduce((a, g) => a + g.len, 0) / 1000, maxV = Math.max(...[...G.nodes.values()].map(n => n.ele ?? -1)), minV = Math.min(...[...G.nodes.values()].map(n => n.ele ?? 9e9));
+  ui.trailGroups = gs;
+  const ranks = [1, 2, 3, 4, 5].filter(r => named.some(g => g.rank === r));
+  content.innerHTML = liveCard() + `
+    <div class="stats">
+      <div class="card"><b>${lifts.filter(g => g.name).length || lifts.length}</b><span>lifts</span></div>
+      <div class="card"><b>${Math.round(totalKm)}</b><span>km of runs</span></div>
+      <div class="card"><b>${G.hasEle ? Math.round(maxV - minV).toLocaleString() : '–'}</b><span>m vertical</span></div>
+    </div>
+    <div class="section-title">Lifts</div>
+    <div class="card" style="padding:4px 6px">${lifts.sort((a, b) => (a.name || 'zz').localeCompare(b.name || 'zz')).map(g => `
+      <div class="trail" data-action="focus" data-g="${gs.indexOf(g)}">${liftIcon(16)}<span class="t-name">${g.name || 'Unnamed ' + g.typeLabel.toLowerCase()}</span>
+      <span class="t-meta">${g.typeLabel} · ${Math.round(g.len / g.speed / 60)} min</span>${statusPill(groupStatus(g))}</div>`).join('')}</div>
+    ${ranks.map(r => `
+      <div class="section-title">${style(r).label}${r === 3 && runs.some(g => g.edges[0].way.unknownDiff) ? ' (incl. untagged)' : ''}</div>
+      <div class="card" style="padding:4px 6px">${named.filter(g => g.rank === r).sort((a, b) => a.name.localeCompare(b.name)).map(g => `
+        <div class="trail" data-action="focus" data-g="${gs.indexOf(g)}">${diffIcon(r, 14)}<span class="t-name">${g.name}</span>
+        <span class="t-meta">${fmtKm(g.len)}${g.vert ? ` · ${Math.round(g.vert)} m ↓` : ''}</span>${statusPill(groupStatus(g))}</div>`).join('')}</div>`).join('')}
+    ${unnamed ? `<p class="hint">+ ${unnamed} unnamed run sections on the map.</p>` : ''}
+    <p class="src">Run &amp; lift data © OpenStreetMap contributors. Coverage and difficulty tags depend on local mappers — ${G.ways.length} ways loaded.</p>`;
+}
+
+function buildSteps(edges){
+  const steps = [];
+  for (const e of edges){
+    const last = steps[steps.length - 1];
+    if (e.kind === 'link' && e.walk && e.h >= 60){
+      if (last && last.kind === 'walk'){ last.time += e.cost; last.len += e.h; }
+      else steps.push({kind:'walk', name:'', time:e.cost, len:e.h, vert:0, rank:0});
+      continue;
+    }
+    if (e.kind === 'link'){ if (last){ last.time += e.cost; last.linkLen = (last.linkLen || 0) + e.length; } else steps.push({kind:'link', name:'', time:e.cost, len:e.length, vert:0, rank:0}); continue; }
+    const key = e.kind + '|' + (e.name || '#' + e.wayId);
+    if (last && last.key === key){ last.time += e.cost; last.len += e.length; last.vert += e.vert; last.rank = Math.max(last.rank, e.rank); continue; }
+    steps.push({key, kind:e.kind, name:edgeName(e) + (e.down ? ' down' : ''), rank:e.rank, time:e.cost, len:e.length, vert:e.vert, typeLabel:e.typeLabel, wait:e.wait, first:e});
+  }
+  return steps;
+}
+
+function renderRoute(){
+  const f = ui.routeFriend, r = ui.route, nav = ui.nav;
+  const routeEdges = nav ? (you.edge ? [you.edge] : []).concat(you.navQueue) : r && !r.error ? r.edges : [];
+  ui.routeSig = routeSig();
+  const meet = nav ? nav.meet : r.meet;
+  let html = `<button class="back" data-action="back">‹ Back</button>
+    <div class="route-head">${avatar(f)}<div><h2>${nav ? 'Navigating to' : 'Route to'} ${f.name}</h2><div class="status" id="rStatus"></div></div></div>`;
+  if (r && r.error && !nav){
+    content.innerHTML = html + `<div class="err">No way to reach the ${nodeLabel(meet)} from your position${G.live && G.live.enforce ? ' using the lifts and runs that are open right now' : ' on the lift & run network'}.</div>`;
+    return updateRoute();
+  }
+  if (!nav){
+    const fastest = r.options[r.options.length - 1].time;
+    html += `<div class="section-title">${r.options.length > 1 ? `${r.options.length} ways to reach ${f.name}` : `Your route`}</div>
+      <div class="ropts">${r.options.map(o => {
+        const total = Object.values(o.mix).reduce((a, b) => a + b, 0) || 1;
+        return `<button class="ropt${o === r.pick ? ' on' : ''}" data-action="pick" data-k="${o.key}">
+          <span class="radio"></span>
+          <span><span class="nm">${o.name}</span><span class="hard">${o.hardest ? `${diffIcon(o.hardest, 11)} up to ${style(o.hardest).label.toLowerCase()}` : 'lifts only'}</span></span>
+          <span class="tmw"><span class="tm">${fmtT(o.time)}</span>${o.time - fastest >= 30 ? `<small>+${fmtT(o.time - fastest)}</small>` : o.time === fastest && r.options.length > 1 ? '<small class="best">quickest</small>' : ''}</span>
+          <span class="mix">${[1, 2, 3, 4, 5].filter(k => o.mix[k]).map(k => `<i style="width:${(o.mix[k] / total * 100).toFixed(1)}%;background:${style(k).color}" title="${style(k).label}: ${fmtKm(o.mix[k])}"></i>`).join('')}</span>
+          <span class="meta">${o.skiKm.toFixed(1)} km skiing · ${o.lifts} lift${o.lifts === 1 ? '' : 's'}${o.walk >= 60 ? ` · ${fmtKm(o.walk)} walk` : ''}</span>
+        </button>`; }).join('')}</div>
+      <p class="hint" style="margin-bottom:12px">Each option is the quickest way using only runs up to that difficulty. Fainter lines on the map show the alternatives — tap one to switch.</p>
+      <div class="section-title">Directions · ${r.pick.name}</div>`;
+  } else {
+    html += `<div class="section-title">Directions · ${nav.optName}${nav.hardest ? ` · up to ${style(nav.hardest).label.toLowerCase()}` : ''}</div>`;
+  }
+  const steps = buildSteps(routeEdges);
+  html += `
+    <div class="eta">
+      <div class="card"><div class="lab">You arrive in</div><div class="val" id="rYou">–</div></div>
+      <div class="card"><div class="lab">${f.name} arrives in</div><div class="val" id="rFriend">–</div></div>
+    </div>
+    <div class="meetbox" id="rMeet"></div>
+    <ol class="steps">
+      <li class="step"><div class="ic"><span style="width:12px;height:12px;border-radius:50%;background:#1a73e8;border:2px solid #fff;box-shadow:0 0 0 1px #1a73e8"></span></div>
+        <div><div class="ttl">${you.edge ? 'You' : 'Start at the ' + nodeLabel(you.node)}</div><div class="sub">${you.edge ? statusPlain(you) : 'Your current position'}</div></div><div></div></li>
+      ${steps.map(s => `
+      <li class="step">
+        <div class="ic">${s.kind === 'lift' ? liftIcon(14) : s.kind === 'link' ? '⛷' : s.kind === 'walk' ? '🚶' : diffIcon(s.rank, 12)}</div>
+        <div><div class="ttl">${s.kind === 'lift' ? 'Ride ' + s.name : s.kind === 'link' ? 'Short traverse' : s.kind === 'walk' ? 'Walk to the next lift' : 'Ski ' + s.name}</div>
+          <div class="sub">${s.kind === 'lift' ? `${s.typeLabel} · ${fmtKm(s.len)} · ~${s.wait} min line` : s.kind === 'link' || s.kind === 'walk' ? fmtKm(s.len) + (s.kind === 'walk' ? ' on foot' : '') :`${style(s.rank).label} · ${fmtKm(s.len)}${s.vert ? ` · ${Math.round(s.vert)} m ↓` : ''}`}</div></div>
+        <div class="tm">${fmtT(s.time)}</div>
+      </li>`).join('')}
+      <li class="step"><div class="ic">📍</div><div><div class="ttl">Meet ${f.name}</div><div class="sub">At the ${nodeLabel(meet)}${G.nodes.get(meet).ele != null ? ` · ${Math.round(G.nodes.get(meet).ele).toLocaleString()} m` : ''}</div></div><div></div></li>
+    </ol>
+    ${nav ? `<button class="btn" style="width:100%" data-action="cancel">✕ End navigation</button>`
+          : `<button class="btn route" style="width:100%;padding:12px" data-action="go">▶ Start · ask ${f.name} to wait</button>
+             <p class="hint" style="margin-top:10px">🔔 Once you start, your progress shows in your notifications and as minutes-left on the PisteMap app icon, so you can check it from your lock screen.</p>`}`;
+  content.innerHTML = html;
+  updateRoute();
+}
+function updateRoute(){
+  const f = ui.routeFriend; if (!f) return;
+  const st = document.getElementById('rStatus'); if (st) st.innerHTML = statusHTML(f) + ` · ${Math.round(f.speed * 3.6)} km/h`;
+  const yEl = document.getElementById('rYou'); if (!yEl) return;
+  const nav = ui.nav, r = ui.route;
+  const meet = nav ? nav.meet : r.meet;
+  const youT = nav ? remainingOnEdge(you) + you.navQueue.reduce((a, e) => a + e.cost, 0) : r.time;
+  const fT = f.state === 'waiting' && f.node === meet ? 0 : remainingOnEdge(f);
+  yEl.textContent = youT < 1 ? 'Here' : fmtT(youT);
+  document.getElementById('rFriend').textContent = fT < 1 ? (f.state === 'waiting' ? 'Waiting' : 'Here') : fmtT(fT);
+  const where = nodeLabel(meet);
+  document.getElementById('rMeet').innerHTML = nav
+    ? (f.state === 'waiting' ? `✅ <b>${f.name}</b> is waiting for you at the <b>${where}</b>.` : `📨 ${f.name} will stop and wait at the <b>${where}</b>.`)
+    : `Meeting point: <b>${where}</b> — the next spot ${f.name} reaches. ${youT > fT + 30 ? `They'll get there ~${fmtT(youT - fT)} before you, so we'll ask them to wait.` : `You'll get there first.`}`;
+}
+function routeSig(){
+  const r = ui.route, nav = ui.nav;
+  const edges = nav ? (you.edge ? [you.edge] : []).concat(you.navQueue) : r && !r.error ? r.edges : [];
+  const opts = r && r.options ? r.options.map(o => o.sig + ':' + o.caps.join('')).join('/') : '';
+  return edges.map(e => e.idx).join() + '|' + (r && r.meet) + '|' + !!nav + '|' + opts + '|' + (r && r.error) + '|' + (you.edge && you.edge.idx);
+}
+function pickOption(key){
+  if (ui.nav) return;
+  ui.maxRank = key; ui.route = planRoute(ui.routeFriend);
+  renderRoute(); drawRoute();
+}
+
+// events
+document.getElementById('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b || swallowClick) return;
+  if (isMobile() && ui.sheet === 'peek') setSheet('half');
+  ui.tab = b.dataset.tab; ui.view = 'tabs';
+  if (!ui.nav){ ui.routeFriend = null; ui.route = null; drawRoute(); }
+  renderPanel();
+});
+content.addEventListener('click', e => {
+  const b = e.target.closest('[data-action]'); if (!b) return;
+  const a = b.dataset.action;
+  if (a === 'route') openRoute(b.dataset.id);
+  else if (a === 'locate'){ const s = byId(b.dataset.id); ui.selected = s.id; map.flyTo([s.lat, s.lon], 16, {duration:0.6}); updateFriends(); }
+  else if (a === 'metric'){ ui.lbMetric = b.dataset.m; renderLeaderboard(); }
+  else if (a === 'focus') flashEdges(ui.trailGroups[+b.dataset.g].edges);
+  else if (a === 'pick') pickOption(+b.dataset.k);
+  else if (a === 'sim'){ ui.sim = +b.dataset.v; content.querySelectorAll('[data-action=sim]').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('[data-sim]').forEach(x => x.classList.toggle('on', +x.dataset.sim === ui.sim)); }
+  else if (a === 'go') startNav();
+  else if (a === 'cancel') stopNav('Navigation ended');
+  else if (a === 'back'){ if (!ui.nav){ ui.routeFriend = null; ui.route = null; ui.selected = null; } ui.view = 'tabs'; drawRoute(); renderPanel(); }
+});
+document.querySelectorAll('[data-sim]').forEach(b => b.addEventListener('click', () => {
+  ui.sim = +b.dataset.sim; document.querySelectorAll('[data-sim]').forEach(x => x.classList.toggle('on', x === b));
+}));
+document.getElementById('bFit').onclick = () => G && fitResort();
+document.getElementById('bMe').onclick = () => G && map.flyTo([you.lat, you.lon], 16, {duration:0.6});
+document.getElementById('bLayer').onclick = e => {
+  const toSat = map.hasLayer(topo);
+  if (toSat){ map.removeLayer(topo); sat.addTo(map); } else { map.removeLayer(sat); topo.addTo(map); }
+  const m = document.getElementById('map'); m.classList.toggle('sat', toSat); m.classList.toggle('topo', !toSat);
+  e.currentTarget.classList.toggle('on', toSat);
+};
+
+/* gentle snowfall over the map */
+const snowC = document.getElementById('snow'), sctx = snowC.getContext('2d');
+let snowOn = true, flakes = [];
+function sizeSnow(){
+  const r = snowC.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  snowC.width = r.width * dpr; snowC.height = r.height * dpr; sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const n = Math.round(r.width * r.height / 9000);
+  flakes = Array.from({length:n}, () => ({x:Math.random() * r.width, y:Math.random() * r.height, r:0.8 + Math.random() * 2.2, s:12 + Math.random() * 28, w:Math.random() * 6.28, o:0.45 + Math.random() * 0.45}));
+}
+new ResizeObserver(sizeSnow).observe(snowC);
+function drawSnow(dt){
+  const W = snowC.clientWidth, H = snowC.clientHeight;
+  sctx.clearRect(0, 0, W, H);
+  if (!snowOn) return;
+  for (const f of flakes){
+    f.y += f.s * dt; f.w += dt * 0.8; f.x += Math.sin(f.w) * 0.35;
+    if (f.y > H + 4){ f.y = -4; f.x = Math.random() * W; }
+    sctx.beginPath(); sctx.arc(f.x, f.y, f.r, 0, 6.283);
+    sctx.fillStyle = `rgba(255,255,255,${f.o})`; sctx.fill();
+    sctx.lineWidth = 0.7; sctx.strokeStyle = `rgba(95,140,190,${f.o * 0.45})`; sctx.stroke();
+  }
+}
+document.getElementById('bSnow').onclick = e => { snowOn = !snowOn; e.currentTarget.classList.toggle('on', snowOn); };
+document.getElementById('bPlace').onclick = e => {
+  ui.placing = !ui.placing; e.currentTarget.classList.toggle('on', ui.placing);
+  if (ui.placing) toast('Tap the map where you are');
+};
+document.getElementById('bGps').onclick = () => {
+  if (!navigator.geolocation || !G) return toast('Location not available');
+  navigator.geolocation.getCurrentPosition(p => {
+    const {id, meters} = nearestMainNode(p.coords.latitude, p.coords.longitude);
+    if (meters > 1500) toast(`You're ${(meters/1000).toFixed(0)} km from this resort — keeping the demo position`);
+    else { moveYouTo(id, `Snapped to your GPS: ${nodeLabel(id)}`); map.flyTo([p.coords.latitude, p.coords.longitude], 16); }
+  }, () => toast('Could not get your location'), {enableHighAccuracy:true, timeout:10000});
+};
+
+let toastT;
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 3500); }
+function setLoading(msg, sub){
+  const l = document.getElementById('loading');
+  if (!msg){ l.classList.remove('show'); return; }
+  l.classList.add('show'); document.getElementById('loadMsg').textContent = msg; document.getElementById('loadSub').textContent = sub || '';
+}
+
+/* =========================================================================
+   PHONE LAYOUT — full-screen map with a draggable bottom sheet
+   ========================================================================= */
+const mq = matchMedia('(max-width: 899px)');
+const panel = document.getElementById('panel'), hero = document.getElementById('hero'), mapWrap = document.getElementById('mapWrap');
+const quick = document.getElementById('quick'), banner = document.getElementById('navBanner');
+ui.sheet = 'peek';
+const isMobile = () => document.body.classList.contains('mobile');
+const peekH = () => ['grab', 'quick', 'tabs'].reduce((a, id) => a + document.getElementById(id).offsetHeight, 0) + 12;
+function sheetY(state){
+  const H = panel.offsetHeight;
+  if (state === 'full') return 0;
+  if (state === 'half') return Math.max(0, H - innerHeight * 0.56);
+  return Math.max(0, H - peekH());
+}
+function setSheet(state){
+  ui.sheet = state;
+  if (!isMobile()) return;
+  panel.style.setProperty('--sheet-y', sheetY(state) + 'px');
+  document.body.style.setProperty('--peek', peekH() + 'px');
+}
+let layoutInit = false;
+function applyLayout(){
+  const m = mq.matches;
+  document.body.classList.toggle('mobile', m);
+  if (m && hero.parentNode !== mapWrap) mapWrap.appendChild(hero);
+  if (!m && hero.parentNode !== panel) panel.insertBefore(hero, document.getElementById('tabs'));
+  if (!layoutInit && m){ snowOn = false; document.getElementById('bSnow').classList.remove('on'); }   // save battery on phones
+  layoutInit = true;
+  map.invalidateSize({pan:false});
+  setSheet(ui.sheet);
+}
+mq.addEventListener('change', applyLayout);
+addEventListener('resize', () => setSheet(ui.sheet));
+new ResizeObserver(() => map.invalidateSize({pan:false})).observe(document.getElementById('map'));
+applyLayout();
+
+// map padding that keeps routes clear of the floating header and the sheet
+function mapPad(){
+  if (!isMobile()) return {padding:[70, 70]};
+  const top = (document.body.classList.contains('navon') ? banner.offsetHeight : hero.offsetHeight) + 30;
+  return {paddingTopLeft:[24, top], paddingBottomRight:[76, panel.offsetHeight - sheetY(ui.sheet) + 24]};
+}
+
+// drag the sheet by its handle or tab bar; tap the handle to cycle sizes
+let drag = null, swallowClick = false;
+['grab', 'tabs'].forEach(id => document.getElementById(id).addEventListener('pointerdown', e => {
+  if (!isMobile()) return;
+  drag = {y0:e.clientY, base:sheetY(ui.sheet), moved:false, el:e.currentTarget, id:e.pointerId};
+}));
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dy = e.clientY - drag.y0;
+  if (!drag.moved && Math.abs(dy) < 8) return;
+  if (!drag.moved){ drag.moved = true; panel.classList.add('dragging'); try { drag.el.setPointerCapture(drag.id); } catch {} }
+  panel.style.setProperty('--sheet-y', Math.max(0, Math.min(sheetY('peek'), drag.base + dy)) + 'px');
+});
+addEventListener('pointerup', e => {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.moved){
+    panel.classList.remove('dragging');
+    const dy = e.clientY - d.y0, order = ['full', 'half', 'peek'];
+    let i = order.indexOf(ui.sheet);
+    if (Math.abs(dy) > 50) i = Math.max(0, Math.min(2, i + (dy < 0 ? -1 : 1) * (Math.abs(dy) > 320 ? 2 : 1)));
+    setSheet(order[i]);
+    swallowClick = true; setTimeout(() => swallowClick = false, 50);
+  } else if (d.el.id === 'grab') setSheet(ui.sheet === 'peek' ? 'half' : ui.sheet === 'half' ? 'full' : 'peek');
+});
+
+// quick strip of friends at the top of the sheet — one tap to route
+function renderQuick(){
+  quick.innerHTML = skiers.map(sk => `<button class="qf" data-q="${sk.id}">${avatar(sk)}<b>${sk.isYou ? 'You' : sk.name}</b><small></small></button>`).join('');
+  updateQuick();
+}
+function updateQuick(){
+  quick.querySelectorAll('.qf').forEach(b => {
+    const sk = byId(b.dataset.q);
+    b.classList.toggle('sel', ui.selected === sk.id);
+    b.querySelector('small').textContent = sk.state === 'waiting' ? 'waiting' : sk.state === 'riding' || sk.state === 'queue' ? 'on lift'
+      : sk.state === 'idle' ? 'stopped' : Math.round(sk.speed * 3.6) + ' km/h';
+  });
+}
+quick.addEventListener('click', e => {
+  const b = e.target.closest('.qf'); if (!b) return;
+  if (b.dataset.q === 'you') return map.flyTo([you.lat, you.lon], 16, {duration:0.6});
+  ui.tab = 'friends'; openRoute(b.dataset.q);
+});
+
+// Progress outside the app while meeting a friend: an ongoing notification (lock screen /
+// notification shade) plus a minutes-left badge on the home-screen icon. The screen is allowed
+// to sleep as normal to save battery.
+const NOTE_TAG = 'pistemap-nav';
+let lastNote = '';
+async function swReg(){ try { return 'serviceWorker' in navigator ? await navigator.serviceWorker.ready : null; } catch { return null; } }
+function askNotify(){
+  if (!('Notification' in window)) return Promise.resolve(false);
+  if (Notification.permission === 'default') return Notification.requestPermission().then(p => p === 'granted').catch(() => false);
+  return Promise.resolve(Notification.permission === 'granted');
+}
+async function showProgress(title, body){
+  const key = title + '|' + body; if (key === lastNote) return; lastNote = key;
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const reg = await swReg(); if (!reg || !ui.nav) return;
+  reg.showNotification(title, {tag:NOTE_TAG, body, icon:'icon-192.png', badge:'icon-192.png', silent:true, renotify:false,
+    requireInteraction:true, data:{nav:true}, actions:[{action:'open', title:'Open map'}, {action:'end', title:'End'}]}).catch(() => {});
+}
+async function setBadge(min){ try { if (min == null) await navigator.clearAppBadge?.(); else await navigator.setAppBadge?.(min); } catch {} }
+async function endPresence(finalMsg){
+  lastNote = ''; setBadge(null); document.title = 'PisteMap';
+  const reg = await swReg(); if (!reg) return;
+  try { (await reg.getNotifications({tag:NOTE_TAG})).forEach(n => n.close()); } catch {}
+  if (finalMsg && 'Notification' in window && Notification.permission === 'granted')
+    reg.showNotification('Met up! 🎉', {tag:NOTE_TAG, body:finalMsg.replace(/^🎉\s*/, ''), icon:'icon-192.png'}).catch(() => {});
+}
+function updatePresence(total, f, stepText){
+  const mins = Math.max(1, Math.ceil(total / 60));
+  setBadge(total < 1 ? 0 : mins);
+  document.title = `${total < 1 ? 'Arrived' : mins + ' min'} to ${f.name} · PisteMap`;
+  const friendLine = f.state === 'waiting' ? `${f.name} is waiting for you ✓` : `${f.name} is on the way`;
+  showProgress(total < 1 ? `You're at the meeting point` : `⛷ ${mins} min to ${f.name}`, `${stepText}\n${friendLine}`);
+}
+// the notification's "End" button
+if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', e => {
+  if (e.data && e.data.type === 'end-nav' && ui.nav) stopNav('Navigation ended');
+});
+
+// big turn-by-turn banner over the map
+function updateBanner(){
+  document.body.classList.toggle('navon', !!ui.nav);
+  if (!ui.nav) return;
+  const f = ui.nav.friend, steps = buildSteps((you.edge ? [you.edge] : []).concat(you.navQueue)), s = steps[0], n = steps[1];
+  const verb = st => st.kind === 'lift' ? `Ride ${st.name}` : st.kind === 'walk' ? 'Walk to the next lift' : st.kind === 'link' ? 'Short traverse' : `Ski ${st.name}`;
+  const total = remainingOnEdge(you) + you.navQueue.reduce((a, e) => a + e.cost, 0);
+  const fT = f.state === 'waiting' && f.node === ui.nav.meet ? 0 : remainingOnEdge(f);
+  let ic, title, sub;
+  if (!s){ ic = '📍'; title = `Wait here for ${f.name}`; sub = `At the ${nodeLabel(ui.nav.meet)}`; }
+  else {
+    ic = s.kind === 'lift' ? GLYPH.lift : s.kind === 'walk' ? '🚶' : s.kind === 'link' ? '⛷' : GLYPH.ski;
+    title = you.state === 'queue' ? `Queue for ${s.name}` : verb(s);
+    const left = Math.max(0, s.len - (you.edge ? you.d : 0));
+    sub = s.kind === 'run' ? `${style(s.rank).label} · ${fmtKm(left)} to go` : s.kind === 'lift' ? `${s.typeLabel} · ${fmtKm(left)} to go` : `${fmtKm(left)} on foot`;
+  }
+  banner.innerHTML = `<div class="nb-row"><div class="nb-ic">${ic}</div><div class="nb-main"><b>${title}</b><span>${sub}</span></div>
+    <div class="nb-eta"><b>${total < 1 ? 'Now' : fmtT(total)}</b><small>to ${f.name}</small></div></div>
+    <div class="nb-next"><span>${s ? (n ? 'Then: ' + verb(n) : `Then: meet ${f.name}`) : ''}</span>
+    <span>${f.state === 'waiting' ? `<span class="ok">✓ ${f.name} is waiting</span>` : `${f.name} there in ${fmtT(fT)}`}</span></div>`;
+  updatePresence(total, f, s ? (you.state === 'queue' ? `Queue for ${s.name}` : verb(s)) + (n ? ` → then ${verb(n).replace(/^\w/, c => c.toLowerCase())}` : '') : `Wait here for ${f.name}`);
+}
+
+/* =========================================================================
+   LIVE LIFT & RUN STATUS
+   Polls /api/status/<resort> (server.py reads the resort's own feed) every 3 minutes,
+   matches feed names to the map's lifts and runs, and closes them for routing.
+   ========================================================================= */
+const STATUS_EVERY = 3 * 60 * 1000;
+let statusTimer = null;
+const STOP = new Set(['the', 'de', 'des', 'du', 'la', 'le', 'les', 'di', 'del', 'und', 'and', 'am', 'im', 'nr', 'no']);
+const LIFT_WORDS = /\b(\d*(eub|ksb|kseb|dsb|sb|sl|tb|seb|gb|pb|lsb|kb|stb|ub|tsd|tsf|tc|tk|tph|tlc|ts|fun)|telecabine|telesiege|teleski|telepherique|funiculaire|chairlift|chair|gondola|express|sesselbahn|gondelbahn|seilbahn|schlepplift|kabinenbahn|lift|piste|skiroute|run|slope|ski|route)\b/g;
+const normName = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  .replace(/ß/g, 'ss').replace(LIFT_WORDS, ' ').replace(/[^a-z0-9]+/g, ' ').trim()
+  .split(' ').filter(t => t && !STOP.has(t));
+// lift codes ("A1", "C30") and section numerals ("I", "II") often appear on only one side
+const isCode = t => /^([a-z]?\d+[a-z]?|i{1,3}|iv|v|vi)$/.test(t);
+function nameScore(a, b){
+  const raw = nameScoreRaw(a, b);
+  const a2 = a.filter(t => !isCode(t)), b2 = b.filter(t => !isCode(t));
+  return (a2.length === a.length && b2.length === b.length) ? raw : Math.max(raw, 0.92 * nameScoreRaw(a2, b2));
+}
+function nameScoreRaw(a, b){
+  if (!a.length || !b.length) return 0;
+  const A = new Set(a), B = new Set(b); let inter = 0; A.forEach(t => { if (B.has(t)) inter++; });
+  let sc = 0.5 * inter / Math.min(A.size, B.size) + 0.5 * inter / Math.max(A.size, B.size);
+  const ja = a.join(''), jb = b.join('');
+  if (ja === jb) return 1;
+  if (ja.length > 4 && jb.length > 4 && (ja.includes(jb) || jb.includes(ja))) sc = Math.max(sc, 0.8);
+  return sc;
+}
+// match each OSM lift/run (by name, or by piste number) to a feed entry
+function matchStatus(items, ways, kind){
+  const cands = items.map(it => ({it, toks: normName(it.name), num: (it.number || (/^(\d{1,3}[a-z]?)\b/i.exec(it.name) || [])[1] || '').toLowerCase()}));
+  let matched = 0;
+  ways.filter(w => w.kind === kind).forEach(w => {
+    const ref = String(w.tags['piste:ref'] || w.tags.ref || '').toLowerCase();
+    const toks = normName(w.name);
+    let best = null, bs = 0;
+    for (const c of cands){
+      let sc = nameScore(toks, c.toks);
+      if (ref && c.num && ref === c.num) sc = Math.max(sc, toks.length ? 0.7 + 0.3 * sc : 0.9);
+      if (sc > bs){ bs = sc; best = c; }
+    }
+    w.live = bs >= 0.6 ? best.it.status : null;
+    if (w.live) matched++;
+  });
+  return matched;
+}
+async function refreshStatus(token, quiet){
+  const r = currentResort;
+  if (!r || !r.id || !G) return;
+  // server.py answers /api/status; on static hosting (GitHub Pages) a scheduled job publishes status/<id>.json
+  let s = null;
+  for (const url of ['api/status/' + r.id, 'status/' + r.id + '.json']){
+    try { const res = await fetch(url, {cache:'no-store'}); if (res.ok){ s = await res.json(); break; } } catch {}
+  }
+  if (!s){ if (!quiet) toast('Live lift status unavailable (offline?)'); return; }
+  if (token !== loadToken) return;
+  const prev = G.live;
+  G.ways.forEach(w => w.live = null);
+  if (!s.available){ G.live = {available:false, reason:s.reason}; }
+  else {
+    const mL = matchStatus(s.lifts, G.ways, 'lift'), mR = matchStatus(s.runs, G.ways, 'run');
+    const lo = s.lifts.filter(x => x.status === 'open').length, ro = s.runs.filter(x => x.status === 'open').length;
+    G.live = {available:true, updated:s.updated * 1000, sources:s.sources, lifts:{open:lo, total:s.lifts.length}, runs:{open:ro, total:s.runs.length}, matchedLifts:mL, matchedRuns:mR,
+      // with nothing running (e.g. before the season) routing ignores status so the app still works
+      enforce: lo > 0};
+  }
+  G.edges.forEach(e => { const st = e.way && e.way.live; e.shut = st === 'closed' || st === 'scheduled'; });
+  // demo friends standing on something that's closed move to open terrain
+  if (G.live.enforce){
+    const openEdges = G.edges.filter(e => e.main && e.kind !== 'link' && !e.down && !e.shut);
+    friends.forEach(f => {
+      if (!(f.edge && f.edge.shut) || f.state === 'waiting' || (ui.nav && ui.nav.friend === f) || !openEdges.length) return;
+      const ok = openEdges.filter(e => allowed(f, e)), e = pick(ok.length ? ok : openEdges);
+      Object.assign(f, {edge:e, node:e.from, d:Math.random() * e.length * 0.5, state: e.kind === 'lift' ? 'riding' : 'skiing', holdAt:null});
+    });
+  }
+  drawNetwork(); drawRoute(); paintConds();
+  if (ui.view === 'tabs' && ui.tab === 'trails') renderTrails();
+  if (ui.route && !ui.nav && ui.routeFriend){ ui.route = planRoute(ui.routeFriend); ui.routeSig = ''; }
+  // a lift on your route just closed → find another way
+  if (ui.nav && G.live.enforce){
+    const ahead = you.navQueue;
+    const hit = ahead.find(e => e.shut);
+    if (hit){
+      const r2 = dijkstra(you.edge ? you.edge.to : you.node, ui.nav.meet, 5);
+      if (r2){ you.navQueue = r2.edges; toast(`⚠ ${edgeName(hit)} just closed — rerouted`); drawRoute(); ui.routeSig = ''; }
+      else toast(`⚠ ${edgeName(hit)} just closed — no other open way to ${ui.nav.friend.name}`);
+    }
+  }
+  if (prev && prev.available && G.live.available && prev.lifts.open !== G.live.lifts.open && quiet)
+    toast(`Lift update: ${G.live.lifts.open} of ${G.live.lifts.total} lifts open`);
+}
+function startStatusPolling(token){
+  clearInterval(statusTimer);
+  refreshStatus(token, false);
+  statusTimer = setInterval(() => { if (document.visibilityState === 'visible') refreshStatus(token, true); }, STATUS_EVERY);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && G && G.live && G.live.updated && Date.now() - G.live.updated > STATUS_EVERY) refreshStatus(loadToken, true);
+});
+const statusPill = st => st === 'open' ? '<span class="stp st-open">Open</span>' : st === 'closed' ? '<span class="stp st-closed">Closed</span>'
+  : st === 'scheduled' ? '<span class="stp st-sched">Opening</span>' : '';
+const agoText = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m + ' min ago'; };
+function liveCard(){
+  const L = G && G.live;
+  if (!L) return `<div class="card livecard"><span class="dot wait"></span><div><b>Checking live lift status…</b></div></div>`;
+  if (!L.available) return `<div class="card livecard"><span class="dot off"></span><div><b>Live status not available</b><div class="status">${L.reason || ''}</div></div></div>`;
+  const src = (L.sources || []).map(s => `<a href="${s.url}" target="_blank" rel="noopener">${s.type}</a>`).join(', ');
+  return `<div class="card livecard"><span class="dot ${L.lifts.open ? 'on' : 'off'}"></span><div>
+    <b>${L.lifts.open} of ${L.lifts.total} lifts open · ${L.runs.open} of ${L.runs.total} runs open</b>
+    <div class="status">Live from the resort · updated ${agoText(L.updated)} · source: ${src}</div>
+    ${L.enforce ? '' : '<div class="status" style="color:#b45309">Nothing is running right now — routes are shown as if everything were open.</div>'}</div></div>`;
+}
+
+/* =========================================================================
+   RESORT LOADING
+   ========================================================================= */
+const sel = document.getElementById('resortSel');
+sel.innerHTML = `<option value="near">📍 Nearest to me…</option>` +
+  [...new Set(RESORTS.map(r => r.region))].map(reg => `<optgroup label="${reg}">${RESORTS.filter(r => r.region === reg).map(r => `<option value="${r.id}">${r.name} · ${r.country}</option>`).join('')}</optgroup>`).join('') +
+  `<option value="custom" hidden>Custom area</option>`;
+let currentResort = null;
+sel.onchange = () => {
+  if (sel.value === 'near') return findNearestResort();
+  const r = RESORTS.find(x => x.id === sel.value); if (r) loadResort(r);
+};
+function findNearestResort(){
+  const revert = () => { sel.value = currentResort && currentResort.id ? currentResort.id : 'custom'; };
+  if (!navigator.geolocation){ revert(); return toast('Location not available on this device'); }
+  toast('Finding your location…');
+  navigator.geolocation.getCurrentPosition(p => {
+    const {latitude:la, longitude:lo} = p.coords;
+    const km = r => { const c = [(r.bbox[0] + r.bbox[2]) / 2, (r.bbox[1] + r.bbox[3]) / 2];
+      return Math.hypot(c[0] - la, (c[1] - lo) * Math.cos(la * Math.PI / 180)) * 111; };
+    const best = RESORTS.slice().sort((a, b) => km(a) - km(b))[0];
+    if (km(best) < 25){ sel.value = best.id; loadResort(best); }
+    else {
+      // not at a preset resort: look for runs & lifts right around the user instead
+      revert();
+      toast(`Nearest preset is ${best.name} (${Math.round(km(best))} km). Searching your area instead…`);
+      loadResort({id:null, name:'Your area', bbox:[la - 0.03, lo - 0.045, la + 0.03, lo + 0.045].map(v => +v.toFixed(4))});
+    }
+  }, () => { revert(); toast('Could not get your location — pick a resort from the list'); }, {timeout:10000});
+}
+document.getElementById('bSearch').onclick = () => document.getElementById('searchArea').onclick();
+document.getElementById('searchArea').onclick = () => {
+  const b = map.getBounds();
+  if (b.getNorth() - b.getSouth() > 0.25 || b.getEast() - b.getWest() > 0.35) return toast('Zoom in to one ski area first');
+  const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(v => +v.toFixed(4));
+  loadResort({id:null, name:'This area', bbox});
+};
+
+let loadToken = 0;
+async function loadResort(resort){
+  const token = ++loadToken;
+  if (ui.nav) stopNav();
+  Object.assign(ui, {view:'tabs', routeFriend:null, route:null, selected:null});
+  setLoading(`Loading ${resort.name}…`, 'Runs & lifts from OpenStreetMap');
+  try {
+    const osm = await loadOSM(resort);
+    if (token !== loadToken) return;
+    setLoading('Building trail network…');
+    const pre = buildGraph(osm, resort.bbox);
+    if (!pre){ setLoading(); toast('No ski runs or lifts mapped in this area'); return; }
+    SCHEME = (pre.lon0 < -30 && pre.lon0 > -170) ? SCHEMES.na : SCHEMES.eu;
+    ui.maxRank = 5;
+    // elevation is needed only for graph nodes (junctions & ends)
+    const ids = new Set();
+    pre.ways.forEach(w => w.nodes.forEach((id, i) => { if (pre.split.has(id)) ids.add(id); }));
+    let ele = {};
+    try { ele = await loadElevations([...ids].map(id => ({id, lat: pre.coord.get(id)[0], lon: pre.coord.get(id)[1]})), 'pm-ele-' + (resort.id || resort.bbox.join(','))); }
+    catch (err){ toast('Elevation service unavailable — speeds & vertical are estimates'); }
+    if (token !== loadToken) return;
+    G = finishGraph(pre, ele);
+    if (!G.mainNodes.length){ setLoading(); toast('Could not build a connected lift/run network here'); return; }
+    const name = resort.id ? resort.name : (pre.areas[0] || resort.name);
+    currentResort = resort;
+    cacheSet('pm-last', resort.id ? {id:resort.id} : {name, bbox:resort.bbox});
+    if (!resort.id){ const o = sel.querySelector('[value=custom]'); o.textContent = name; o.hidden = false; sel.value = 'custom'; }
+    G.live = null; startStatusPolling(token);
+    placeSkiers(); drawNetwork(); makeMarkers(); renderQuick(); setSheet(ui.sheet); fitResort(); drawLegend(); renderPanel(); updateMarkers();
+    setLoading();
+    loadWeather(token);
+  } catch (err){
+    console.error(err);
+    setLoading(); toast('Could not load resort data (' + err.message + '). Try again in a moment.');
+  }
+}
+
+async function loadWeather(token){
+  const cond = document.getElementById('conds');
+  const lifts = G.edges.filter(e => e.main && e.kind === 'lift' && !e.down), named = new Set(lifts.map(e => e.wayId));
+  const top = [...G.nodes.values()].reduce((a, n) => (n.ele ?? -1) > (a.ele ?? -1) ? n : a);
+  const I = {
+    flake:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 2 3-2M9 20l3-2 3 2"/></svg>',
+    temp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0Z"/></svg>',
+    wind:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h16a3 3 0 1 1-3 3M3 16h7"/></svg>',
+    lift:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 5 22 2.5M12 3.8V9M6.5 9h11v5.5h-11z"/></svg>',
+    run:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 20 7-12 4 6 2-3 5 9Z"/></svg>',
+  };
+  const km = Math.round(trailGroups().filter(g => g.kind === 'run').reduce((a, g) => a + g.len, 0) / 1000);
+  ui.condIcons = I; ui.condBase = {lifts:named.size, km}; ui.condWx = '';
+  paintConds();
+  try {
+    const key = 'pm-wx-' + top.lat.toFixed(3) + ',' + top.lon.toFixed(3);
+    let w = cacheGet(key);
+    if (!w || Date.now() - w.at > 10 * 60 * 1000){   // weather cached for 10 minutes
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${top.lat.toFixed(4)}&longitude=${top.lon.toFixed(4)}${top.ele != null ? '&elevation=' + Math.round(top.ele) : ''}&current=temperature_2m,wind_speed_10m&daily=snowfall_sum&past_days=1&forecast_days=1&timezone=auto`;
+      let r = await fetch(url);
+      if (r.status === 429){ await new Promise(res => setTimeout(res, 61000)); if (token !== loadToken) return; r = await fetch(url); }
+      if (!r.ok) return;
+      w = await r.json(); w.at = Date.now(); cacheSet(key, w);
+    }
+    if (token !== loadToken) return;
+    const snow = (w.daily.snowfall_sum || []).reduce((a, b) => a + (b || 0), 0);
+    ui.condWx = `<span title="Temperature at the highest point">${I.temp}${Math.round(w.current.temperature_2m)}°C top</span><span title="New snow, last 48 h">${I.flake}${snow.toFixed(0)} cm new</span><span>${I.wind}${Math.round(w.current.wind_speed_10m)} km/h</span>`;
+    paintConds();
+  } catch {}
+}
+
+function paintConds(){
+  const I = ui.condIcons, b = ui.condBase, L = G && G.live; if (!I || !b) return;
+  const lifts = L && L.available ? `<span title="Live from the resort"><i class="livedot ${L.lifts.open ? 'on' : ''}"></i>${L.lifts.open}/${L.lifts.total} lifts open</span>` : `<span>${I.lift}${b.lifts} lifts</span>`;
+  document.getElementById('conds').innerHTML = (ui.condWx || '') + lifts + `<span>${I.run}${b.km} km runs</span>`;
+}
+function drawLegend(){
+  const seen = [1, 2, 3, 4, 5].map(style).filter((s, i, a) => a.findIndex(x => x.key === s.key) === i);
+  document.getElementById('legend').innerHTML = seen.map(s => `<div><svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="${s.color}" stroke-width="3.5" ${s.dash ? 'stroke-dasharray="5 3"' : ''}/></svg>${s.label}</div>`).join('') +
+    `<div><svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#20232a" stroke-width="2"/></svg>Lift</div>` +
+    `<div><svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#7c3aed" stroke-width="4" stroke-dasharray="5 3"/></svg>Your route</div>`;
+}
+
+/* =========================================================================
+   MAIN LOOP
+   ========================================================================= */
+let last = performance.now();
+function frame(now){
+  const real = Math.min(0.1, (now - last) / 1000); last = now;
+  drawSnow(real);
+  let dt = real * ui.sim;
+  if (G && G.mainNodes.length){
+    while (dt > 0){ const h = Math.min(dt, 0.25); skiers.forEach(s => step(s, h)); dt -= h; }
+    updateMarkers();
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+setInterval(() => {
+  if (!G) return;
+  if (ui.view === 'route'){
+    if (!ui.nav && ui.routeFriend) ui.route = planRoute(ui.routeFriend);
+    if (routeSig() !== ui.routeSig){ renderRoute(); drawRoute(); } else updateRoute();
+  } else if (ui.tab === 'friends') updateFriends();
+  else if (ui.tab === 'leaderboard') updateLeaderboard();
+  updateQuick(); updateBanner();
+}, 500);
+
+// installable + works offline once visited (needs https or localhost)
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+// reopen the resort used last time
+(() => {
+  const last = cacheGet('pm-last');
+  const preset = last && last.id && RESORTS.find(r => r.id === last.id);
+  if (preset){ sel.value = preset.id; loadResort(preset); }
+  else if (last && last.bbox) loadResort({id:null, name:last.name, bbox:last.bbox});
+  else { sel.value = RESORTS[0].id; loadResort(RESORTS[0]); }
+})();
+</script>
+</body>
+</html>
