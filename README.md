@@ -3,6 +3,8 @@
 A phone-first ski map: see your friends on the mountain, live speeds, a leaderboard, and the quickest
 lift + run routes to meet up (Easiest / Balanced / Fastest), with live open/closed lift and run status.
 
+**Live app:** https://cilliandaly79.github.io/skiLink/ — open it on your phone and choose *Add to Home Screen*.
+
 ## What's in here
 
 | Path | What it is |
