@@ -27,6 +27,11 @@ FEEDS = {
     "valthorens": [("lumiplan", "val-thorens"), ("lumiplan", "les-menuires"), ("lumiplan", "orelle")],
     "verbier":    [("infosnow", "31")],
     "jackson":    [("jacksonhole", "")],
+    # lift-pass areas (PASSES in index.html)
+    "3vallees":   [("lumiplan", "courchevel"), ("lumiplan", "meribel"), ("lumiplan", "val-thorens"), ("lumiplan", "les-menuires"), ("lumiplan", "orelle")],
+    "arlberg":    [("intermaps", "skiarlberg")],
+    "4vallees":   [("infosnow", "31")],
+    "kitzski":    [("intermaps", "kitzski")],
 }
 SOURCE_PAGES = {
     "intermaps": "https://winter.intermaps.com/{id}/data?lang=en",

@@ -13,7 +13,7 @@ from pathlib import Path
 
 RESORTS = {
     # European Alps first
-    "zermatt":    (45.900,    7.600, 46.030,    7.800),
+    "zermatt":    (45.920,    7.660, 46.030,    7.800),
     "stanton":    (47.100,   10.150, 47.170,   10.300),
     "valthorens": (45.260,    6.530, 45.330,    6.620),
     "verbier":    (46.060,    7.180, 46.130,    7.330),
@@ -21,6 +21,12 @@ RESORTS = {
     "solden":     (46.900,   10.880, 46.990,   11.030),
     "kitzbuehel": (47.380,   12.300, 47.460,   12.420),
     "courchevel": (45.360,    6.540, 45.440,    6.670),
+    # extra pieces that, with the resorts above, make up the ski-pass areas (see PASSES in index.html)
+    "3v-belleville": (45.330,  6.480, 45.365,  6.680),   # Les Menuires / St-Martin: joins Val Thorens to Méribel
+    "arlberg-lech":  (47.165, 10.050, 47.270, 10.250),   # Lech, Zürs, Warth-Schröcken
+    "4v-nendaz":     (46.120,  7.250, 46.210,  7.420),   # Nendaz, Veysonnaz, Thyon
+    "cervinia":      (45.850,  7.580, 45.950,  7.720),   # Breuil-Cervinia, Valtournenche
+    "kitz-south":    (47.300, 12.300, 47.385, 12.470),   # Jochberg, Pass Thurn
     # rest of the world
     "jackson":    (43.565, -110.885, 43.615, -110.800),
     "whistler":   (50.030, -123.000, 50.130, -122.850),

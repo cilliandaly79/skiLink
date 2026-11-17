@@ -14,7 +14,8 @@ sys.path.insert(0, str(ROOT))
 import server  # noqa: E402  (reuses the feed parsers)
 
 ALL = ["zermatt", "stanton", "valthorens", "verbier", "ischgl", "solden", "kitzbuehel", "courchevel",
-       "jackson", "whistler", "vail", "niseko"]
+       "jackson", "whistler", "vail", "niseko",
+       "3vallees", "arlberg", "4vallees", "matterhorn", "kitzski"]   # lift-pass areas
 
 
 def main():

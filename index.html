@@ -106,9 +106,49 @@
   .brandrow .live{margin-left:auto;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);padding:3px 9px;border-radius:999px;display:flex;align-items:center;gap:6px}
   .brandrow .live i{width:7px;height:7px;border-radius:50%;background:#7dffb0;box-shadow:0 0 0 3px rgba(125,255,176,.25)}
   .selwrap{position:relative;margin:10px 0 10px;display:inline-block;max-width:100%}
-  #resortSel{appearance:none;-webkit-appearance:none;background:transparent;border:0;color:#fff;font-size:26px;font-weight:800;letter-spacing:-.3px;padding:0 30px 0 0;max-width:100%;text-shadow:0 2px 12px rgba(10,40,90,.25);outline:none}
-  #resortSel option,#resortSel optgroup{color:var(--ink);font-size:15px;font-weight:500}
-  .selwrap::after{content:"";position:absolute;right:4px;top:50%;width:9px;height:9px;border-right:2.5px solid #fff;border-bottom:2.5px solid #fff;transform:translateY(-75%) rotate(45deg);pointer-events:none}
+  .resort-btn{display:inline-flex;align-items:center;gap:10px;background:none;border:0;padding:0;color:#fff;font-size:26px;font-weight:800;letter-spacing:-.3px;text-align:left;text-shadow:0 2px 12px rgba(10,40,90,.25);max-width:100%}
+  .resort-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .resort-btn .chev{flex:none;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.45);position:relative}
+  .resort-btn .chev::after{content:"";position:absolute;left:8px;top:6px;width:7px;height:7px;border-right:2.5px solid #fff;border-bottom:2.5px solid #fff;transform:rotate(45deg)}
+  .passline{display:flex;gap:6px;flex-wrap:wrap;margin:-4px 0 10px;position:relative;z-index:1}
+  .passline:empty{display:none}
+  .passchip{border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:700;backdrop-filter:blur(6px)}
+  .passchip.on{background:#fff;color:#1a5fc2;border-color:#fff}
+  /* resort picker */
+  .picker{position:fixed;inset:0;z-index:3000;background:rgba(10,30,60,.45);display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+  .picker.shown{display:flex}
+  .picker.open{opacity:1}
+  .pk-sheet{width:min(440px,94vw);max-height:86vh;display:flex;flex-direction:column;border-radius:26px;overflow:hidden;background:linear-gradient(180deg,#f8fcff,#eef6fc);box-shadow:0 24px 60px rgba(10,30,60,.35);transform:translateY(16px);transition:transform .25s cubic-bezier(.2,.85,.25,1)}
+  .picker.open .pk-sheet{transform:none}
+  .pk-head{position:relative;padding:18px 18px 40px;color:#fff;background:
+      radial-gradient(circle at 15% 30%,rgba(255,255,255,.5) 1.5px,transparent 2.3px),radial-gradient(circle at 80% 22%,rgba(255,255,255,.45) 1.4px,transparent 2.2px),
+      radial-gradient(circle at 55% 55%,rgba(255,255,255,.35) 1.2px,transparent 2px),linear-gradient(155deg,#1d4f9c 0%,#2f7fdc 50%,#69bdf5 100%)}
+  .pk-head h3{margin:0;font-size:22px;font-weight:800}
+  .pk-head p{margin:2px 0 0;font-size:13px;opacity:.9}
+  .pk-close{position:absolute;right:14px;top:14px;width:36px;height:36px;border-radius:50%;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.2);color:#fff;font-size:16px}
+  .pk-head .mtn{position:absolute;left:0;bottom:-1px;width:100%;height:30px}
+  .pk-tools{display:flex;gap:8px;padding:0 14px;margin-top:-22px;position:relative;z-index:1}
+  .pk-search{flex:1;min-width:0;border:1px solid #fff;background:rgba(255,255,255,.95);border-radius:14px;padding:11px 14px;font:inherit;font-size:15px;box-shadow:var(--shadow);outline:none;color:var(--ink)}
+  .pk-search:focus{border-color:var(--accent)}
+  .pk-near{flex:none;border:0;border-radius:14px;padding:0 14px;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),#4aa3f0);box-shadow:0 4px 12px rgba(43,125,233,.35)}
+  .pk-list{overflow:auto;padding:6px 14px 18px}
+  .pk-card{background:#fff;border:1.5px solid #e3eef7;border-radius:18px;margin-bottom:8px;box-shadow:var(--shadow-s);overflow:hidden}
+  .pk-card.on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(43,125,233,.14),var(--shadow-s)}
+  .pk-top{display:flex;align-items:center;gap:12px;width:100%;border:0;background:none;padding:12px 14px;text-align:left}
+  .pk-flag{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:800;font-size:12.5px;color:#1a5fc2;background:linear-gradient(135deg,#e2eefb,#f4f9ff);border:1px solid #d6e6f7}
+  .pk-top b{display:block;font-size:16px}
+  .pk-top small{color:var(--muted);font-size:12.5px}
+  .pk-check{margin-left:auto;width:22px;height:22px;border-radius:50%;border:2px solid var(--frost);flex:none}
+  .pk-card.on .pk-check{border:6px solid var(--accent)}
+  .pk-passes{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 12px 64px;margin-top:-4px}
+  .pk-pass{border:1.5px solid var(--line);background:var(--ice);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:700;color:var(--ink)}
+  .pk-pass.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .pk-pass small{display:block;font-weight:500;font-size:11px;opacity:.75}
+  .pk-empty{color:var(--muted);text-align:center;padding:24px 0}
+  .mobile .picker{align-items:flex-end}
+  .mobile .pk-sheet{width:100%;max-height:92vh;border-radius:26px 26px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  .mobile .picker .pk-sheet{transform:translateY(40px)}
+  .mobile .picker.open .pk-sheet{transform:none}
   .conds{display:flex;gap:6px;flex-wrap:wrap;position:relative;z-index:1}
   .conds span{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);padding:4px 10px;border-radius:999px;backdrop-filter:blur(6px)}
   .conds svg{width:14px;height:14px}
@@ -253,7 +293,9 @@
   .mobile .hero{position:absolute;top:calc(env(safe-area-inset-top) + 10px);left:10px;right:10px;z-index:1001;border-radius:22px;padding:10px 14px 11px;box-shadow:0 8px 26px rgba(23,64,117,.3)}
   .mobile .hero .mtn,.mobile .hero .brandrow{display:none}
   .mobile .selwrap{margin:0 0 7px}
-  .mobile #resortSel{font-size:21px}
+  .mobile .resort-btn{font-size:21px}
+  .mobile .resort-btn .chev{width:24px;height:24px}
+  .mobile .resort-btn .chev::after{left:7px;top:5px}
   .mobile .conds{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-14px;padding-right:14px}
   .mobile .conds::-webkit-scrollbar{display:none}
   .mobile .conds span{flex:none;font-size:13px}
@@ -317,7 +359,8 @@
     <div class="quick" id="quick"></div>
     <div class="hero" id="hero">
       <div class="brandrow"><span class="logo">▲</span>PisteMap<span class="live"><i></i>Live</span></div>
-      <div class="selwrap"><select id="resortSel" title="Choose resort"></select></div>
+      <div class="selwrap"><button id="resortBtn" class="resort-btn" title="Choose resort"><span id="resortName">Loading…</span><i class="chev"></i></button></div>
+      <div class="passline" id="passLine"></div>
       <div class="conds" id="conds"><span>Loading…</span></div>
       <svg class="mtn" viewBox="0 0 400 64" preserveAspectRatio="none">
         <path d="M0 64V40l38-18 22 10 46-28 34 22 30-12 40 26 48-30 36 20 40-14 26 10 40-8v66Z" fill="rgba(255,255,255,.35)"/>
@@ -334,24 +377,59 @@
   </aside>
 </div>
 
+<div class="picker" id="picker" role="dialog" aria-modal="true" aria-label="Choose your resort">
+  <div class="pk-sheet">
+    <div class="pk-head"><h3>Where are you skiing?</h3><p>Pick a resort — or the whole area your lift pass covers.</p>
+      <button class="pk-close" id="pkClose" aria-label="Close">✕</button>
+      <svg class="mtn" viewBox="0 0 400 30" preserveAspectRatio="none"><path d="M0 30V18l40-10 30 6 46-14 40 12 36-8 42 10 46-12 40 10 36-6 44 8v24Z" fill="#f8fcff"/></svg>
+    </div>
+    <div class="pk-tools"><input class="pk-search" id="pkSearch" type="search" placeholder="Search resorts" autocomplete="off"><button class="pk-near" id="pkNear">📍 Near me</button></div>
+    <div class="pk-list" id="pkList"></div>
+  </div>
+</div>
 <script>
 /* =========================================================================
    CONFIG
    ========================================================================= */
 const RESORTS = [   // keep in sync with tools/fetch_resorts.py
-  {id:'zermatt',    name:'Zermatt – Cervinia',    country:'CH', region:'Alps', bbox:[45.900,7.600,46.030,7.800]},
-  {id:'stanton',    name:'St. Anton am Arlberg',  country:'AT', region:'Alps', bbox:[47.100,10.150,47.170,10.300]},
-  {id:'valthorens', name:'Val Thorens',           country:'FR', region:'Alps', bbox:[45.260,6.530,45.330,6.620]},
-  {id:'verbier',    name:'Verbier',               country:'CH', region:'Alps', bbox:[46.060,7.180,46.130,7.330]},
-  {id:'ischgl',     name:'Ischgl',                country:'AT', region:'Alps', bbox:[46.930,10.250,47.020,10.380]},
+  {id:'zermatt',    name:'Zermatt',               country:'CH', region:'Alps', bbox:[45.920,7.660,46.030,7.800], passes:['matterhorn']},
+  {id:'stanton',    name:'St. Anton am Arlberg',  country:'AT', region:'Alps', bbox:[47.100,10.150,47.170,10.300], passes:['arlberg']},
+  {id:'valthorens', name:'Val Thorens',           country:'FR', region:'Alps', bbox:[45.260,6.530,45.330,6.620], passes:['3vallees']},
+  {id:'verbier',    name:'Verbier',               country:'CH', region:'Alps', bbox:[46.060,7.180,46.130,7.330], passes:['4vallees']},
+  {id:'ischgl',     name:'Ischgl · Samnaun',      country:'AT', region:'Alps', bbox:[46.930,10.250,47.020,10.380]},
   {id:'solden',     name:'Sölden',                country:'AT', region:'Alps', bbox:[46.900,10.880,46.990,11.030]},
-  {id:'kitzbuehel', name:'Kitzbühel',             country:'AT', region:'Alps', bbox:[47.380,12.300,47.460,12.420]},
-  {id:'courchevel', name:'Courchevel & Méribel',  country:'FR', region:'Alps', bbox:[45.360,6.540,45.440,6.670]},
+  {id:'kitzbuehel', name:'Kitzbühel',             country:'AT', region:'Alps', bbox:[47.380,12.300,47.460,12.420], passes:['kitzski']},
+  {id:'courchevel', name:'Courchevel & Méribel',  country:'FR', region:'Alps', bbox:[45.360,6.540,45.440,6.670], passes:['3vallees']},
   {id:'jackson',    name:'Jackson Hole',          country:'US', region:'Rest of the world', bbox:[43.565,-110.885,43.615,-110.800]},
   {id:'whistler',   name:'Whistler Blackcomb',    country:'CA', region:'Rest of the world', bbox:[50.030,-123.000,50.130,-122.850]},
   {id:'vail',       name:'Vail',                  country:'US', region:'Rest of the world', bbox:[39.570,-106.450,39.650,-106.300]},
   {id:'niseko',     name:'Niseko United',         country:'JP', region:'Rest of the world', bbox:[42.820,140.620,42.890,140.720]},
 ];
+// extra data pieces (data/<id>.json) that join resorts into their lift-pass areas
+const PARTS = {
+  '3v-belleville':[45.330,6.480,45.365,6.680], 'arlberg-lech':[47.165,10.050,47.270,10.250],
+  '4v-nendaz':[46.120,7.250,46.210,7.420], 'cervinia':[45.850,7.580,45.950,7.720], 'kitz-south':[47.300,12.300,47.385,12.470],
+};
+// lift-pass areas: one ticket, several linked resorts — loaded as one connected map
+const PASSES = {
+  '3vallees':   {id:'3vallees',   name:'Les 3 Vallées',          pass:'3 Vallées pass',   country:'FR', parts:['courchevel', 'valthorens', '3v-belleville'],
+                 covers:'Courchevel · Méribel · Val Thorens · Les Menuires · Orelle'},
+  'arlberg':    {id:'arlberg',    name:'Ski Arlberg',            pass:'Ski Arlberg pass', country:'AT', parts:['stanton', 'arlberg-lech'],
+                 covers:'St. Anton · St. Christoph · Stuben · Lech · Zürs · Warth-Schröcken'},
+  '4vallees':   {id:'4vallees',   name:'4 Vallées',              pass:'4 Vallées pass',   country:'CH', parts:['verbier', '4v-nendaz'],
+                 covers:'Verbier · La Tzoumaz · Nendaz · Veysonnaz · Thyon'},
+  'matterhorn': {id:'matterhorn', name:'Matterhorn Ski Paradise', pass:'International pass', country:'CH', parts:['zermatt', 'cervinia'],
+                 covers:'Zermatt · Breuil-Cervinia · Valtournenche'},
+  'kitzski':    {id:'kitzski',    name:'KitzSki',                pass:'KitzSki full area', country:'AT', parts:['kitzbuehel', 'kitz-south'],
+                 covers:'Kitzbühel · Kirchberg · Jochberg · Pass Thurn'},
+};
+const partBbox = id => (RESORTS.find(r => r.id === id) || {}).bbox || PARTS[id];
+Object.values(PASSES).forEach(p => {   // pass area = union of its pieces
+  const bs = p.parts.map(partBbox);
+  p.bbox = [Math.min(...bs.map(b => b[0])), Math.min(...bs.map(b => b[1])), Math.max(...bs.map(b => b[2])), Math.max(...bs.map(b => b[3]))];
+  p.region = 'Alps'; p.isPass = true;
+});
+const findArea = id => RESORTS.find(r => r.id === id) || PASSES[id];
 const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
 
 // speed m/s, typical line in minutes
@@ -391,6 +469,16 @@ const cacheGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catc
 const cacheSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
 async function loadOSM(resort){
+  if (resort.parts){
+    // pass area: merge its pieces (shared lifts/runs appear once)
+    const seen = new Map();
+    for (const pid of resort.parts){
+      setLoading(`Loading ${resort.name}…`, `Joining ${resort.parts.indexOf(pid) + 1} of ${resort.parts.length} areas`);
+      const osm = await loadOSM({id:pid, name:pid, bbox:partBbox(pid)});
+      osm.elements.forEach(e => seen.set(e.type + e.id, e));
+    }
+    return {elements:[...seen.values()]};
+  }
   if (resort.id){
     try { const r = await fetch(`data/${resort.id}.json`); if (r.ok) return r.json(); } catch {}
   }
@@ -867,7 +955,9 @@ function checkMeet(){
    MAP
    ========================================================================= */
 const map = L.map('map', {zoomControl:false, preferCanvas:true, attributionControl:true, zoomSnap:0.25, zoomDelta:0.5, wheelPxPerZoomLevel:90});
-const canvas = L.canvas({tolerance:8, padding:0.5}), svgR = L.svg({padding:0.5});
+// smaller off-screen margin on phones: high-density screens make big canvases memory-hungry
+const PAD = document.body.classList.contains('mobile') ? 0.15 : 0.5;
+const canvas = L.canvas({tolerance:8, padding:PAD}), svgR = L.svg({padding:PAD});
 const topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {maxZoom:17, maxNativeZoom:17, subdomains:'abc',
   attribution:'Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | Style © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA) | Elevation: Open-Meteo'}).addTo(map);
 const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, maxNativeZoom:18,
@@ -1599,17 +1689,70 @@ function liveCard(){
 /* =========================================================================
    RESORT LOADING
    ========================================================================= */
-const sel = document.getElementById('resortSel');
-sel.innerHTML = `<option value="near">📍 Nearest to me…</option>` +
-  [...new Set(RESORTS.map(r => r.region))].map(reg => `<optgroup label="${reg}">${RESORTS.filter(r => r.region === reg).map(r => `<option value="${r.id}">${r.name} · ${r.country}</option>`).join('')}</optgroup>`).join('') +
-  `<option value="custom" hidden>Custom area</option>`;
+// the selected area (resort, lift-pass area, or custom map area) — the picker below sets it
 let currentResort = null;
-sel.onchange = () => {
-  if (sel.value === 'near') return findNearestResort();
-  const r = RESORTS.find(x => x.id === sel.value); if (r) loadResort(r);
+const sel = {
+  _v:'', onchange:null,
+  get value(){ return this._v; },
+  set value(v){ this._v = v; paintResortBtn(); },
 };
+const COUNTRY = {CH:'Switzerland', AT:'Austria', FR:'France', IT:'Italy', US:'USA', CA:'Canada', JP:'Japan'};
+function baseOf(passId){ return RESORTS.find(r => r.id === ui.passBase && (r.passes || []).includes(passId)) || RESORTS.find(r => (r.passes || []).includes(passId)); }
+function paintResortBtn(){
+  const a = findArea(sel.value);
+  document.getElementById('resortName').textContent = a ? a.name : sel.value === 'custom' ? (ui.customName || 'This area') : 'Choose resort';
+  // quick toggle between the resort and its lift-pass area
+  const line = document.getElementById('passLine');
+  if (a && a.isPass){ const b = baseOf(a.id);
+    line.innerHTML = `<button class="passchip on" data-area="${a.id}">✓ ${a.pass}</button>` + (b ? `<button class="passchip" data-area="${b.id}">${b.name} only</button>` : ''); }
+  else if (a && a.passes){ line.innerHTML = a.passes.map(pid => `<button class="passchip" data-area="${pid}">＋ ${PASSES[pid].pass}</button>`).join(''); }
+  else line.innerHTML = '';
+}
+function chooseArea(id){
+  closePicker();
+  if (id === sel.value) return;
+  const a = findArea(id); if (!a) return;
+  if (!a.isPass) ui.passBase = a.id;
+  sel.value = id; loadResort(a);
+}
+document.getElementById('passLine').addEventListener('click', e => { const b = e.target.closest('[data-area]'); if (b) chooseArea(b.dataset.area); });
+
+// themed resort picker
+const picker = document.getElementById('picker'), pkList = document.getElementById('pkList'), pkSearch = document.getElementById('pkSearch');
+function renderPicker(){
+  const q = pkSearch.value.trim().toLowerCase();
+  const match = r => !q || [r.name, COUNTRY[r.country], r.country, ...(r.passes || []).flatMap(p => [PASSES[p].name, PASSES[p].covers])].join(' ').toLowerCase().includes(q);
+  const card = r => {
+    const ids = [r.id, ...(r.passes || [])], on = ids.includes(sel.value);
+    return `<div class="pk-card${on ? ' on' : ''}">
+      <button class="pk-top" data-area="${r.id}"><span class="pk-flag">${r.country}</span>
+        <span><b>${r.name}</b><small>${COUNTRY[r.country] || ''}${r.passes ? ' · ' + r.passes.map(p => PASSES[p].name).join(', ') + ' available' : ''}</small></span><span class="pk-check"></span></button>
+      ${r.passes ? `<div class="pk-passes"><button class="pk-pass${sel.value === r.id ? ' on' : ''}" data-area="${r.id}">Resort only</button>${r.passes.map(p =>
+        `<button class="pk-pass${sel.value === p ? ' on' : ''}" data-area="${p}" title="${PASSES[p].covers}">${PASSES[p].pass}<small>${PASSES[p].covers}</small></button>`).join('')}</div>` : ''}
+    </div>`;
+  };
+  const regions = [...new Set(RESORTS.map(r => r.region))];
+  const html = regions.map(reg => { const rs = RESORTS.filter(r => r.region === reg && match(r));
+    return rs.length ? `<div class="section-title">${reg === 'Alps' ? 'European Alps' : reg}</div>` + rs.map(card).join('') : ''; }).join('');
+  pkList.innerHTML = html || `<div class="pk-empty">No resorts match “${pkSearch.value}”. Pan the map to any ski area and use 🔍 Search this area.</div>`;
+}
+function openPicker(){
+  pkSearch.value = ''; renderPicker();
+  picker.classList.add('shown'); requestAnimationFrame(() => requestAnimationFrame(() => picker.classList.add('open')));
+  if (!isMobile()) setTimeout(() => pkSearch.focus(), 50);
+}
+function closePicker(){
+  if (!picker.classList.contains('shown')) return;
+  picker.classList.remove('open'); setTimeout(() => { if (!picker.classList.contains('open')) picker.classList.remove('shown'); }, 220);   // fully removed when closed
+}
+document.getElementById('resortBtn').onclick = openPicker;
+document.getElementById('pkClose').onclick = closePicker;
+picker.addEventListener('click', e => { if (e.target === picker) return closePicker(); const b = e.target.closest('[data-area]'); if (b) chooseArea(b.dataset.area); });
+pkSearch.addEventListener('input', renderPicker);
+document.getElementById('pkNear').onclick = () => { closePicker(); findNearestResort(); };
+addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
 function findNearestResort(){
-  const revert = () => { sel.value = currentResort && currentResort.id ? currentResort.id : 'custom'; };
+  const revert = () => { sel.value = currentResort && currentResort.id ? currentResort.id : (currentResort ? 'custom' : ''); };
   if (!navigator.geolocation){ revert(); return toast('Location not available on this device'); }
   toast('Finding your location…');
   navigator.geolocation.getCurrentPosition(p => {
@@ -1617,7 +1760,7 @@ function findNearestResort(){
     const km = r => { const c = [(r.bbox[0] + r.bbox[2]) / 2, (r.bbox[1] + r.bbox[3]) / 2];
       return Math.hypot(c[0] - la, (c[1] - lo) * Math.cos(la * Math.PI / 180)) * 111; };
     const best = RESORTS.slice().sort((a, b) => km(a) - km(b))[0];
-    if (km(best) < 25){ sel.value = best.id; loadResort(best); }
+    if (km(best) < 25){ chooseArea(best.id); }
     else {
       // not at a preset resort: look for runs & lifts right around the user instead
       revert();
@@ -1660,7 +1803,7 @@ async function loadResort(resort){
     const name = resort.id ? resort.name : (pre.areas[0] || resort.name);
     currentResort = resort;
     cacheSet('pm-last', resort.id ? {id:resort.id} : {name, bbox:resort.bbox});
-    if (!resort.id){ const o = sel.querySelector('[value=custom]'); o.textContent = name; o.hidden = false; sel.value = 'custom'; }
+    if (!resort.id){ ui.customName = name; sel.value = 'custom'; }
     G.live = null; startStatusPolling(token);
     placeSkiers(); drawNetwork(); makeMarkers(); renderQuick(); setSheet(ui.sheet); fitResort(); drawLegend(); renderPanel(); updateMarkers();
     setLoading();
@@ -1745,7 +1888,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 // reopen the resort used last time
 (() => {
   const last = cacheGet('pm-last');
-  const preset = last && last.id && RESORTS.find(r => r.id === last.id);
+  const preset = last && last.id && findArea(last.id);
   if (preset){ sel.value = preset.id; loadResort(preset); }
   else if (last && last.bbox) loadResort({id:null, name:last.name, bbox:last.bbox});
   else { sel.value = RESORTS[0].id; loadResort(RESORTS[0]); }
