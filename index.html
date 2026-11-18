@@ -2,30 +2,45 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#2f7fdc">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f2f2f7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000">
+<meta name="color-scheme" content="light dark">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="PisteMap">
+<meta name="apple-mobile-web-app-title" content="skiLink">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-180.png">
-<title>PisteMap</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
+<title>skiLink</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="account.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
+  /* Apple system palette (light); dark values below. Older names alias the new tokens. */
   :root{
-    --ink:#0f2742; --muted:#5f7690; --line:#dce8f3; --card:#ffffff; --ice:#f2f8fd; --ice2:#e2eef8; --frost:#c9def0;
-    --accent:#2b7de9; --accent-d:#1a5fc2; --route:#ff6b2c; --glass:rgba(255,255,255,.78);
-    --shadow:0 6px 24px rgba(23,64,117,.14); --shadow-s:0 2px 10px rgba(23,64,117,.07);
+    --bg:#f2f2f7; --bg2:#ffffff; --bg3:#f2f2f7; --fill:rgba(120,120,128,.12); --fill2:rgba(120,120,128,.2);
+    --label:#000000; --label2:rgba(60,60,67,.62); --label3:rgba(60,60,67,.32); --sep:rgba(60,60,67,.16);
+    --tint:#007aff; --green:#34c759; --red:#ff3b30; --orange:#ff9500; --indigo:#5856d6;
+    --mat:rgba(255,255,255,.74); --mat-solid:rgba(255,255,255,.97); --nav:#1c1c1e;
+    --ink:var(--label); --muted:var(--label2); --line:var(--sep); --card:var(--bg2); --ice:var(--fill); --ice2:var(--fill2); --frost:var(--label3);
+    --accent:var(--tint); --accent-d:var(--tint); --route:var(--indigo); --glass:var(--mat);
+    --shadow:0 8px 28px rgba(0,0,0,.12); --shadow-s:0 1px 3px rgba(0,0,0,.06);
+    --ease-out:cubic-bezier(.23,1,.32,1); --sheet-ease:cubic-bezier(.32,.72,0,1);
+    color-scheme:light dark;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#000000; --bg2:#1c1c1e; --bg3:#2c2c2e; --fill:rgba(118,118,128,.24); --fill2:rgba(118,118,128,.32);
+      --label:#ffffff; --label2:rgba(235,235,245,.62); --label3:rgba(235,235,245,.3); --sep:rgba(84,84,88,.6);
+      --tint:#0a84ff; --green:#30d158; --red:#ff453a; --orange:#ff9f0a; --indigo:#5e5ce6;
+      --mat:rgba(30,30,30,.72); --mat-solid:rgba(28,28,30,.97); --nav:#2c2c2e;
+      --shadow:0 8px 28px rgba(0,0,0,.5); --shadow-s:0 1px 3px rgba(0,0,0,.4);
+    }
   }
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;background:#eaf3fa;color:var(--ink);font:14px/1.4 "Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+  html,body{margin:0;height:100%;background:#eaf3fa;color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
   button,select{font:inherit;color:inherit;cursor:pointer}
   #app{display:grid;grid-template-columns:1fr 400px;height:100vh;height:100dvh}
   #mapWrap{position:relative;overflow:hidden}
@@ -41,7 +56,6 @@
   .topbar{position:absolute;top:14px;left:14px;right:14px;display:flex;gap:8px;align-items:center;pointer-events:none;flex-wrap:wrap;z-index:1000}
   .topbar>*{pointer-events:auto}
   .pillbtn{border-radius:999px;padding:9px 15px;font-weight:600;display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--ink)}
-  .pillbtn:hover{background:#fff}
   .simctl{margin-left:auto;border-radius:999px;display:flex;align-items:center;padding:4px;gap:2px;font-size:12.5px}
   .simctl span{padding:0 8px;color:var(--muted);font-weight:500}
   .simctl button{border:0;background:none;padding:6px 11px;border-radius:999px;font-weight:700}
@@ -49,7 +63,6 @@
   .mapctl{position:absolute;right:14px;bottom:34px;display:flex;flex-direction:column;border-radius:16px;overflow:hidden;z-index:1000}
   .mapctl button{width:44px;height:44px;border:0;background:none;font-size:17px;display:grid;place-items:center;color:var(--ink);border-bottom:1px solid rgba(15,39,66,.07)}
   .mapctl button:last-child{border-bottom:0}
-  .mapctl button:hover{background:rgba(255,255,255,.9)}
   .mapctl button.on{background:var(--accent);color:#fff}
   .mapctl svg{width:20px;height:20px}
   .legend{position:absolute;left:14px;bottom:28px;border-radius:16px;padding:9px 12px;font-size:12px;display:grid;grid-template-columns:auto auto;gap:5px 14px;color:var(--muted);z-index:1000;font-weight:500}
@@ -88,7 +101,7 @@
   @keyframes dash{to{stroke-dashoffset:-20}}
   .hl-line{animation:hl .8s ease-in-out infinite alternate}
   @keyframes hl{from{opacity:.3}to{opacity:.95}}
-  .leaflet-tooltip{font:13px/1.35 "Outfit",system-ui,sans-serif;border-radius:10px;padding:6px 10px;border:0;box-shadow:var(--shadow)}
+  .leaflet-tooltip{font:13px/1.35 -apple-system,system-ui,sans-serif;border-radius:10px;padding:6px 10px;border:0;box-shadow:var(--shadow)}
   .leaflet-control-attribution{font-size:10px;background:rgba(255,255,255,.7)!important;border-radius:8px 0 0 0}
 
   /* panel */
@@ -174,9 +187,7 @@
   .speed small{display:block;color:var(--muted);font-size:10.5px;margin-top:3px;font-weight:500}
   .actions{grid-column:1/-1;display:flex;gap:8px;margin-top:8px}
   .btn{border:1px solid var(--line);background:var(--ice);border-radius:12px;padding:9px 13px;font-weight:600;font-size:13px;display:inline-flex;align-items:center;gap:6px;justify-content:center;transition:.15s}
-  .btn:hover{background:#fff}
   .btn.route{background:linear-gradient(135deg,#ff8a4c,#ff5a1f);border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(255,90,31,.28)}
-  .btn.route:hover{filter:brightness(1.05)}
   .btn.grow{flex:1}
   .hint{color:var(--muted);font-size:12.5px;padding:10px 12px;margin:0 0 6px;background:rgba(255,255,255,.6);border:1px dashed var(--frost);border-radius:14px}
   .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -199,7 +210,6 @@
   .podium .medal{font-size:18px;display:block;margin-bottom:4px}
   .trail{display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid #edf3f9;cursor:pointer;border-radius:10px}
   .trail:last-child{border-bottom:0}
-  .trail:hover{background:var(--ice)}
   .trail .t-name{flex:1;font-weight:600}
   .trail .t-meta{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0}
@@ -224,7 +234,6 @@
   .step .tm{color:var(--muted);font-weight:600;font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
   .ropts{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
   .ropt{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;padding:12px 14px;border:1.5px solid #e3eef7;border-radius:18px;background:#fff;text-align:left;box-shadow:var(--shadow-s);transition:.15s;width:100%}
-  .ropt:hover{border-color:#cdb8f7}
   .ropt.on{border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.14),var(--shadow-s);background:linear-gradient(135deg,#faf7ff,#fff)}
   .ropt .radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--frost);grid-row:span 3;align-self:start;margin-top:2px;transition:.15s}
   .ropt.on .radio{border:5.5px solid #7c3aed}
@@ -272,9 +281,9 @@
   /* phones: skip GPU-heavy effects that make iPhone Safari run out of graphics memory */
   .mobile *, .mobile *::before, .mobile *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
   .mobile .frost-edge{display:none}
-  .mobile .glass{background:rgba(255,255,255,.97)}
-  .mobile .tabs{background:#fff}
-  .mobile #toast{background:#0f2742}
+  .mobile .glass{background:var(--mat-solid)}
+  .mobile .tabs{background:var(--fill)}
+  .mobile #toast{background:var(--nav)}
   /* while onboarding covers the screen, don't render the app underneath */
   body.ob-open #app{visibility:hidden}
   .grab,.quick{display:none}
@@ -333,6 +342,145 @@
   .democard .seg button{border:0;background:none;padding:7px 13px;border-radius:999px;font-weight:700}
   .democard .seg button.on{background:var(--ink);color:#fff}
   @media (prefers-reduced-motion:reduce){#snow{display:none}.route-line,.me .halo,.sk.sel .ring{animation:none}}
+
+
+  /* =====================================================================
+     Apple-style makeover (apple-design + mobile-native skills)
+     ===================================================================== */
+  html{-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+  html,body{background:var(--bg);color:var(--label)}
+  button,a,[role=button],.qf,.trail,.pk-top,.ropt{touch-action:manipulation}
+  button,[role=button],.tabs,.chip,.grab,.qf,.passchip,.stp{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  input,select,textarea{font-size:16px}
+  /* type: tracking per size - tight on large titles, near zero on body, slightly open on small */
+  .route-head h2,.pk-head h3{letter-spacing:-.02em}
+  .section-title{font-size:13px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label2);margin:22px 16px 7px}
+  .status,.hint,.t-meta,.speed small,.sub,.ropt .meta,.src{letter-spacing:0}
+  .stp,.lvl,.tag{letter-spacing:.02em}
+  /* surfaces: grouped background, rounded cards, hairline separators */
+  #panel{background:var(--bg);border-left:.5px solid var(--sep)}
+  .content{padding:4px 16px 24px}
+  .card,.steps,.ropt,.podium .p,.stats .card{background:var(--bg2);border:0;border-radius:14px;box-shadow:none}
+  .podium .p.first{background:var(--bg2);box-shadow:inset 0 0 0 1.5px var(--orange)}
+  .lb-row,.trail{border-bottom:.5px solid var(--sep)}
+  .lb-row.me{background:var(--fill)}
+  .hint{background:transparent;border:0;padding:6px 16px;color:var(--label2);font-size:13px}
+  .bar,.ropt .mix{background:var(--fill)}
+  .friend.sel,.ropt.on,.pk-card.on{box-shadow:0 0 0 2px var(--tint)}
+  .ropt.on{background:var(--bg2)}
+  .ropt .radio{border-color:var(--label3)}
+  .ropt.on .radio{border-color:var(--tint)}
+  .ropt .tmw small.best{color:var(--tint)}
+  .avatar{border-color:var(--bg2);box-shadow:none}
+  .lvl{background:var(--fill);color:var(--label2)}
+  .eta .card:first-child .val{color:var(--tint)}
+  .meetbox{background:var(--bg2);border:0;border-radius:14px;box-shadow:inset 3px 0 0 var(--orange)}
+  .step:not(:last-child)::after{background:var(--sep)}
+  .step .ic{background:var(--fill);border:0;color:var(--tint)}
+  .step .ic svg{width:16px;height:16px}
+  .err{background:var(--bg2);color:var(--red);border:0;box-shadow:inset 3px 0 0 var(--red)}
+  /* buttons: filled tint for primary, tinted fill for secondary (iOS) */
+  .btn{background:var(--fill);border:0;color:var(--tint);font-weight:600;border-radius:12px}
+  .btn.route{background:var(--tint);color:#fff;box-shadow:none}
+  .chip{background:var(--fill);border:0;color:var(--label)}
+  .chip.on{background:var(--label);color:var(--bg2)}
+  .back{color:var(--tint)}
+  /* segmented control */
+  .tabs{background:var(--fill);border:0;border-radius:10px;padding:2px;margin:10px 16px 6px;box-shadow:none;gap:0}
+  .tabs button{border-radius:8px;padding:7px 4px;font-size:13.5px;font-weight:600;color:var(--label)}
+  .tabs button.on{background:var(--bg2);color:var(--label);box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04)}
+  /* header: large title on the grouped background, no banner gradient */
+  .hero{background:var(--bg);color:var(--label);padding:16px 16px 6px}
+  .hero .mtn{display:none}
+  .brandrow{color:var(--label2);font-size:13px;font-weight:600}
+  .brandrow .logo{background:var(--tint);border:0;color:#fff}
+  .brandrow .live{background:var(--fill);border:0;color:var(--label2)}
+  .brandrow .live i{background:var(--green);box-shadow:none}
+  .resort-btn{color:var(--label);font-size:30px;font-weight:700;letter-spacing:-.025em;line-height:1.12;text-shadow:none}
+  .resort-btn .chev{background:var(--fill);border:0}
+  .resort-btn .chev::after{border-color:var(--label2)}
+  .passchip{background:var(--fill);border:0;color:var(--tint);backdrop-filter:none}
+  .passchip.on{background:var(--tint);color:#fff}
+  .conds span{background:var(--bg2);border:0;color:var(--label);font-weight:500;backdrop-filter:none}
+  .conds svg{color:var(--tint)}
+  .livedot{background:var(--label3)} .livedot.on{background:var(--green);box-shadow:none}
+  /* floating chrome over the map: translucent material (solid on phones, see below) */
+  .glass{background:var(--mat);border:.5px solid var(--sep);box-shadow:var(--shadow);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%)}
+  .mapctl button{color:var(--tint);border-bottom:.5px solid var(--sep)}
+  .mapctl button.on{background:var(--tint);color:#fff}
+  .simctl button.on{background:var(--label);color:var(--bg2)}
+  .legend{color:var(--label2)}
+  #toast{background:var(--nav);color:#fff;border-radius:999px;padding:12px 20px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .loadcard #loadSub{color:var(--label2)}
+  .flake-spin{color:var(--tint)}
+  /* turn-by-turn banner: Apple Maps style dark card */
+  #navBanner{background:var(--nav);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+  .nb-ic{background:var(--indigo)}
+  .nb-next{border-top-color:rgba(255,255,255,.14)}
+  .nb-next .ok{color:var(--green)}
+  /* status pills (system colours, readable in both modes) */
+  .st-open{color:var(--green);background:color-mix(in srgb,var(--green) 16%,transparent)}
+  .st-closed{color:var(--red);background:color-mix(in srgb,var(--red) 14%,transparent)}
+  .st-sched{color:var(--orange);background:color-mix(in srgb,var(--orange) 16%,transparent)}
+  .livecard .dot.on{background:var(--green);box-shadow:none;animation:none}
+  /* resort picker: grouped list sheet */
+  .pk-sheet{background:var(--bg)}
+  .pk-head{background:var(--bg);color:var(--label);padding:20px 18px 8px}
+  .pk-head .mtn{display:none}
+  .pk-head p{color:var(--label2)}
+  .pk-close{background:var(--fill);border:0;color:var(--label2)}
+  .pk-tools{margin-top:4px}
+  .pk-search{background:var(--fill);border:0;box-shadow:none;border-radius:10px;padding:9px 12px;color:var(--label)}
+  .pk-near{background:var(--fill);color:var(--tint);box-shadow:none;border-radius:10px}
+  .pk-card{background:var(--bg2);border:0;border-radius:14px;box-shadow:none}
+  .pk-flag{background:var(--fill);border:0;color:var(--tint)}
+  .pk-check{border-color:var(--label3)}
+  .pk-card.on .pk-check{border-color:var(--tint)}
+  .pk-pass{background:var(--fill);border:0;color:var(--label)}
+  .pk-pass.on{background:var(--tint);color:#fff}
+  .picker{background:rgba(0,0,0,.4)}
+  /* bottom sheet + quick strip */
+  .mobile #panel{background:var(--bg);border-radius:14px 14px 0 0;box-shadow:0 -1px 0 var(--sep),0 -8px 30px rgba(0,0,0,.14)}
+  .grab i{background:var(--label3);width:36px}
+  .qf small{color:var(--label2)}
+  .qf.sel .avatar{box-shadow:0 0 0 2.5px var(--tint)}
+  .mobile .quick{touch-action:pan-x}
+  .mobile #panel{transition:transform .5s var(--sheet-ease)}
+  .mobile #panel.dragging{transition:none}
+  .mobile .grab{touch-action:none}
+  .mobile .tabs{touch-action:none}
+  @media (prefers-reduced-motion: reduce){ .mobile #panel{transition:transform .2s ease-out} }
+  .democard .seg{background:var(--fill)}
+  .democard .seg button.on{background:var(--bg2);color:var(--label);box-shadow:0 2px 6px rgba(0,0,0,.12)}
+  /* press feedback on touch-down (instant), release eases back */
+  .btn,.chip,.passchip,.qf,.mapctl button,.resort-btn,.pk-pass,.pk-near,.simctl button,.tabs button,.back,.pk-close{transition:transform .16s var(--ease-out),background-color .16s,opacity .16s}
+  .btn:active,.chip:active,.passchip:active,.qf:active,.pk-pass:active,.pk-near:active,.simctl button:active,.back:active{transform:scale(.96);transition-duration:.08s}
+  .mapctl button:active{background:var(--fill)}
+  .resort-btn:active{opacity:.6;transition-duration:.08s}
+  .trail,.pk-top,.ropt,.lb-row{transition:background-color .2s}
+  .trail:active,.pk-top:active,.lb-row:active{background:var(--fill);transition-duration:0s}
+  .ropt:active{transform:scale(.985);transition:transform .08s}
+  /* phones: same look with solid materials - iPhone Safari runs out of graphics memory with large blur layers */
+  .mobile .glass{background:var(--mat-solid)}
+  .mobile .hero{background:var(--mat-solid);box-shadow:0 1px 0 var(--sep),0 8px 24px rgba(0,0,0,.14);border-radius:16px;padding:10px 14px 11px}
+  .mobile .resort-btn{font-size:22px}
+  .mobile .conds span{background:var(--fill)}
+  @media (prefers-reduced-transparency: reduce){ .glass{background:var(--mat-solid);backdrop-filter:none;-webkit-backdrop-filter:none} }
+  @media (prefers-contrast: more){ .glass,.card,.pk-card{border:1px solid var(--label3)} }
+  @media (prefers-reduced-motion: reduce){
+    .route-line,.me .halo,.sk.sel .ring,.flake-spin,.hl-line{animation:none}
+    .btn:active,.chip:active,.qf:active,.ropt:active{transform:none}
+  }
+
+  /* hover only where a precise pointer can hover (touch fakes sticky hovers) */
+  @media (hover: hover) and (pointer: fine){
+    .pillbtn:hover{background:#fff}
+    .mapctl button:hover{background:rgba(255,255,255,.9)}
+    .btn:hover{background:#fff}
+    .btn.route:hover{filter:brightness(1.05)}
+    .trail:hover{background:var(--ice)}
+    .ropt:hover{border-color:#cdb8f7}
+  }
 </style>
 </head>
 <body>
@@ -353,7 +501,7 @@
     <div id="navBanner"></div>
     <div class="mapctl glass">
       <button id="bSearch" title="Load runs & lifts in the visible map area"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></button>
-      <button id="bSnow" class="on" title="Toggle snowfall">❄</button>
+      <button id="bSnow" class="on" title="Toggle snowfall"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M4.2 7l15.6 10M4.2 17 19.8 7M9 4l3 2.5L15 4M9 20l3-2.5 3 2.5"/></svg></button>
       <button id="bLayer" title="Toggle satellite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg></button>
       <button id="bPlace" title="Set my location by tapping the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg></button>
       <button id="bGps" title="Use my GPS location"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
@@ -367,7 +515,7 @@
     <div class="grab" id="grab"><i></i></div>
     <div class="quick" id="quick"></div>
     <div class="hero" id="hero">
-      <div class="brandrow"><span class="logo">▲</span>PisteMap<span class="live"><i></i>Live</span></div>
+      <div class="brandrow"><span class="logo">▲</span>skiLink<span class="live"><i></i>Live</span></div>
       <div class="selwrap"><button id="resortBtn" class="resort-btn" title="Choose resort"><span id="resortName">Loading…</span><i class="chev"></i></button></div>
       <div class="passline" id="passLine"></div>
       <div class="conds" id="conds"><span>Loading…</span></div>
@@ -1037,6 +1185,18 @@ function updateLabels(){
 map.on('zoomend', updateLabels);
 
 // little pictograms used for friends on the map and in the panel
+// SF Symbols-style line icons (one stroke weight, currentColor) used across the app
+const ICON = {
+  snow:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M4.2 7l15.6 10M4.2 17 19.8 7M9 4l3 2.5L15 4M9 20l3-2.5 3 2.5"/></svg>',
+  walk:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2" fill="currentColor" stroke="none"/><path d="m9 21 2.5-6.5L15 17v4M11.5 14.5 13 8l3 3.5 3 .5M13 8l-4 2-1.5 3.5"/></svg>',
+  pin:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21Z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  bell:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 0 0-12 0c0 6-2.5 8-2.5 8h17S18 15 18 9Z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  location: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11 21 3l-8 18-2-8-8-2Z"/></svg>',
+  people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14a5 5 0 0 1 5 5"/></svg>',
+  route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5"/></svg>',
+};
+window.ICON = ICON;
 const GLYPH = {
   ski:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="16.4" cy="3.9" r="2.4" fill="currentColor" stroke="none"/><path d="M14.8 7.3 10.2 10.9l3.6 3-2.6 4.6"/><path d="m14.8 7.3 3.3 3.5 1.6-.3"/><path d="M10.2 10.9 6.7 9.7 4.6 16"/><path d="m2.6 16.4 17.8 4.2"/></svg>`,
   stand: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2.4" fill="currentColor" stroke="none"/><path d="M12 7.5v6.5l-3 6M12 14l3 6M7.5 11 12 9l4.5 2"/><path d="M4.5 21h15"/></svg>`,
@@ -1157,7 +1317,7 @@ function diffIcon(rank, s = 14){
   if (st.key === 'double') return `<svg width="${s*1.6}" height="${s}" viewBox="0 0 22 14"><path d="M6 2 10 7 6 12 2 7Z M16 2 20 7 16 12 12 7Z" fill="${c}"/></svg>`;
   return `<svg width="${s}" height="${s}" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="${c}"/></svg>`;   // EU: coloured dot
 }
-const liftIcon = (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="#3b3f45" stroke-width="1.6" stroke-linecap="round"><path d="M1 3 15 1"/><path d="M8 2v5"/><path d="M4 7h8v4H4z"/><path d="M4 11v3M12 11v3"/></svg>`;
+const liftIcon = (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 3 15 1"/><path d="M8 2v5"/><path d="M4 7h8v4H4z"/><path d="M4 11v3M12 11v3"/></svg>`;
 const avatar = (sk, sm) => `<div class="avatar${sm ? ' sm' : ''}" style="background:${sk.color}" title="${sk.name}">${sk.isYou ? sk.initials : GLYPH.ski}</div>`;
 
 function statusHTML(sk){
@@ -1166,7 +1326,7 @@ function statusHTML(sk){
   const e = sk.edge;
   if (sk.state === 'queue') return `${liftIcon(12)} In line for ${edgeName(e)}`;
   if (sk.state === 'riding') return `${liftIcon(12)} Riding ${edgeName(e)}`;
-  if (e.kind === 'link') return e.walk ? `🚶 Walking to the next lift` : `⛷ Traversing`;
+  if (e.kind === 'link') return e.walk ? `Walking to the next lift` : `Traversing`;
   return `${diffIcon(e.rank, 11)} Skiing ${edgeName(e)}`;
 }
 const statusPlain = sk => statusHTML(sk).replace(/<svg[\s\S]*?<\/svg>/g, '').trim();
@@ -1332,12 +1492,12 @@ function renderRoute(){
         <div><div class="ttl">${you.edge ? 'You' : 'Start at the ' + nodeLabel(you.node)}</div><div class="sub">${you.edge ? statusPlain(you) : 'Your current position'}</div></div><div></div></li>
       ${steps.map(s => `
       <li class="step">
-        <div class="ic">${s.kind === 'lift' ? liftIcon(14) : s.kind === 'link' ? '⛷' : s.kind === 'walk' ? '🚶' : diffIcon(s.rank, 12)}</div>
+        <div class="ic">${s.kind === 'lift' ? liftIcon(14) : s.kind === 'link' ? ICON.arrow : s.kind === 'walk' ? ICON.walk : diffIcon(s.rank, 12)}</div>
         <div><div class="ttl">${s.kind === 'lift' ? 'Ride ' + s.name : s.kind === 'link' ? 'Short traverse' : s.kind === 'walk' ? 'Walk to the next lift' : 'Ski ' + s.name}</div>
           <div class="sub">${s.kind === 'lift' ? `${s.typeLabel} · ${fmtKm(s.len)} · ~${s.wait} min line` : s.kind === 'link' || s.kind === 'walk' ? fmtKm(s.len) + (s.kind === 'walk' ? ' on foot' : '') :`${style(s.rank).label} · ${fmtKm(s.len)}${s.vert ? ` · ${Math.round(s.vert)} m ↓` : ''}`}</div></div>
         <div class="tm">${fmtT(s.time)}</div>
       </li>`).join('')}
-      <li class="step"><div class="ic">📍</div><div><div class="ttl">Meet ${f.name}</div><div class="sub">At the ${nodeLabel(meet)}${G.nodes.get(meet).ele != null ? ` · ${Math.round(G.nodes.get(meet).ele).toLocaleString()} m` : ''}</div></div><div></div></li>
+      <li class="step"><div class="ic">${ICON.pin}</div><div><div class="ttl">Meet ${f.name}</div><div class="sub">At the ${nodeLabel(meet)}${G.nodes.get(meet).ele != null ? ` · ${Math.round(G.nodes.get(meet).ele).toLocaleString()} m` : ''}</div></div><div></div></li>
     </ol>
     ${nav ? `<button class="btn" style="width:100%" data-action="cancel">✕ End navigation</button>`
           : `<button class="btn route" style="width:100%;padding:12px" data-action="go">▶ Start · ask ${f.name} to wait</button>
@@ -1467,10 +1627,13 @@ function sheetY(state){
   if (state === 'half') return Math.max(0, H - innerHeight * 0.56);
   return Math.max(0, H - peekH());
 }
+// the sheet's transform is written directly on the sheet (no inherited CSS variable on every move)
+let sheetPos = 0;
+function placeSheet(y){ sheetPos = y; panel.style.transform = `translateY(${y}px)`; }
 function setSheet(state){
   ui.sheet = state;
-  if (!isMobile()) return;
-  panel.style.setProperty('--sheet-y', sheetY(state) + 'px');
+  if (!isMobile()){ panel.style.transform = ''; return; }
+  placeSheet(sheetY(state));
   document.body.style.setProperty('--peek', peekH() + 'px');
 }
 let layoutInit = false;
@@ -1496,31 +1659,51 @@ function mapPad(){
   return {paddingTopLeft:[24, top], paddingBottomRight:[76, panel.offsetHeight - sheetY(ui.sheet) + 24]};
 }
 
-// drag the sheet by its handle or tab bar; tap the handle to cycle sizes
+// Drag the sheet by its handle, tab bar or friend strip (apple-design + gestures skills):
+// 1:1 tracking, catch it mid-animation, rubber-band past the ends, and on release project the
+// flick's momentum to choose the snap point it is heading for. Tap the handle to cycle sizes.
 let drag = null, swallowClick = false;
-['grab', 'tabs'].forEach(id => document.getElementById(id).addEventListener('pointerdown', e => {
-  if (!isMobile()) return;
-  drag = {y0:e.clientY, base:sheetY(ui.sheet), moved:false, el:e.currentTarget, id:e.pointerId};
+const liveSheetY = () => new DOMMatrixReadOnly(getComputedStyle(panel).transform).m42;   // on-screen value, mid-animation too
+const rubberband = (over, dim, c = 0.55) => (over * dim * c) / (dim + c * Math.abs(over));
+const project = (v, d = 0.99) => (v / 1000) * d / (1 - d);   // Apple's momentum projection, v in px/s (0.99 = Apple's "snappier" rate, right for a sheet)
+['grab', 'tabs', 'quick'].forEach(id => document.getElementById(id).addEventListener('pointerdown', e => {
+  if (!isMobile() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  const y = liveSheetY();
+  panel.classList.add('dragging'); placeSheet(y);   // freeze exactly where it is if it was still moving
+  drag = {x0:e.clientX, y0:e.clientY, base:y, moved:false, el:e.currentTarget, id:e.pointerId, hist:[{y:e.clientY, t:e.timeStamp}]};
 }));
 addEventListener('pointermove', e => {
-  if (!drag) return;
-  const dy = e.clientY - drag.y0;
-  if (!drag.moved && Math.abs(dy) < 8) return;
-  if (!drag.moved){ drag.moved = true; panel.classList.add('dragging'); try { drag.el.setPointerCapture(drag.id); } catch {} }
-  panel.style.setProperty('--sheet-y', Math.max(0, Math.min(sheetY('peek'), drag.base + dy)) + 'px');
+  if (!drag || e.pointerId !== drag.id) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  drag.hist.push({y:e.clientY, t:e.timeStamp});
+  while (drag.hist.length > 2 && e.timeStamp - drag.hist[0].t > 100) drag.hist.shift();
+  if (!drag.moved){
+    if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;                       // ~8px hysteresis before committing
+    if (Math.abs(dx) > Math.abs(dy)){ panel.classList.remove('dragging'); drag = null; return; }   // sideways: leave it to the strip's scroll
+    drag.moved = true; try { drag.el.setPointerCapture(drag.id); } catch {}
+  }
+  const max = sheetY('peek');
+  let y = drag.base + dy;
+  if (y < 0) y = -rubberband(-y, innerHeight);
+  else if (y > max) y = max + rubberband(y - max, innerHeight);
+  placeSheet(y);
 });
-addEventListener('pointerup', e => {
-  if (!drag) return;
+function endDrag(e){
+  if (!drag || e.pointerId !== drag.id) return;
   const d = drag; drag = null;
+  panel.classList.remove('dragging');
   if (d.moved){
-    panel.classList.remove('dragging');
-    const dy = e.clientY - d.y0, order = ['full', 'half', 'peek'];
-    let i = order.indexOf(ui.sheet);
-    if (Math.abs(dy) > 50) i = Math.max(0, Math.min(2, i + (dy < 0 ? -1 : 1) * (Math.abs(dy) > 320 ? 2 : 1)));
-    setSheet(order[i]);
-    swallowClick = true; setTimeout(() => swallowClick = false, 50);
+    const h = d.hist, a = h[0], b = h[h.length - 1];
+    const v = b.t > a.t ? (b.y - a.y) / (b.t - a.t) * 1000 : 0;             // release velocity, px/s
+    const target = sheetPos + project(v);
+    const snap = ['full', 'half', 'peek'].reduce((best, st) => Math.abs(sheetY(st) - target) < Math.abs(sheetY(best) - target) ? st : best, 'peek');
+    setSheet(snap);
+    swallowClick = true; setTimeout(() => swallowClick = false, 60);
   } else if (d.el.id === 'grab') setSheet(ui.sheet === 'peek' ? 'half' : ui.sheet === 'half' ? 'full' : 'peek');
-});
+  else setSheet(ui.sheet);   // a tap: settle back where it was
+}
+addEventListener('pointerup', endDrag);
+addEventListener('pointercancel', endDrag);
 
 // quick strip of friends at the top of the sheet — one tap to route
 function renderQuick(){
@@ -1536,7 +1719,7 @@ function updateQuick(){
   });
 }
 quick.addEventListener('click', e => {
-  const b = e.target.closest('.qf'); if (!b) return;
+  const b = e.target.closest('.qf'); if (!b || swallowClick) return;
   if (b.dataset.q === 'you') return map.flyTo([you.lat, you.lon], 16, {duration:0.6});
   ui.tab = 'friends'; openRoute(b.dataset.q);
 });
@@ -1588,9 +1771,9 @@ function updateBanner(){
   const total = remainingOnEdge(you) + you.navQueue.reduce((a, e) => a + e.cost, 0);
   const fT = f.state === 'waiting' && f.node === ui.nav.meet ? 0 : remainingOnEdge(f);
   let ic, title, sub;
-  if (!s){ ic = '📍'; title = `Wait here for ${f.name}`; sub = `At the ${nodeLabel(ui.nav.meet)}`; }
+  if (!s){ ic = ICON.pin; title = `Wait here for ${f.name}`; sub = `At the ${nodeLabel(ui.nav.meet)}`; }
   else {
-    ic = s.kind === 'lift' ? GLYPH.lift : s.kind === 'walk' ? '🚶' : s.kind === 'link' ? '⛷' : GLYPH.ski;
+    ic = s.kind === 'lift' ? GLYPH.lift : s.kind === 'walk' ? ICON.walk : s.kind === 'link' ? ICON.arrow : GLYPH.ski;
     title = you.state === 'queue' ? `Queue for ${s.name}` : verb(s);
     const left = Math.max(0, s.len - (you.edge ? you.d : 0));
     sub = s.kind === 'run' ? `${style(s.rank).label} · ${fmtKm(left)} to go` : s.kind === 'lift' ? `${s.typeLabel} · ${fmtKm(left)} to go` : `${fmtKm(left)} on foot`;

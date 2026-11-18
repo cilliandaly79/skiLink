@@ -137,15 +137,15 @@ async function permCards(profile){
     st === 'denied' ? `<button class="off" data-perm="${kind}">Try again</button>` : `<button data-perm="${kind}">Allow</button>`;
   const blocked = `<p class="why">Blocked in your browser — turn it on in Settings › your browser › skiLink, then tap Try again.</p>`;
   return `
-    <div class="perm"><div class="ic">📍</div>
+    <div class="perm"><div class="ic" style="--c:var(--tint)">${ICON.location}</div>
       <b>Location ${STATE_TAG[loc]}</b>
       <p>Shows where you are on the piste map and works out routes from your spot to your friends. Only used while skiLink is open.</p>
       <div class="act">${btn('location', loc)}${loc === 'denied' ? blocked : ''}</div></div>
-    <div class="perm"><div class="ic">🔔</div>
+    <div class="perm"><div class="ic" style="--c:var(--red)">${ICON.bell}</div>
       <b>Notifications ${STATE_TAG[note]}</b>
       <p>Meet-up progress on your lock screen (“6 min to Maya”), and a ping when you’ve met up.</p>
       <div class="act">${btn('notifications', note)}${note === 'denied' ? blocked : note === 'unsupported' ? '<p class="why" style="color:var(--muted)">On iPhone, add skiLink to your Home Screen first (Share › Add to Home Screen).</p>' : ''}</div></div>
-    <div class="perm"><div class="ic">👥</div>
+    <div class="perm"><div class="ic" style="--c:var(--green)">${ICON.people}</div>
       <b>Share my location with friends <span class="tag ${profile.shareLocation ? 'ok' : 'na'}">${profile.shareLocation ? 'On' : 'Off'}</span></b>
       <p>Friends you add can see you on their map and find routes to you. You can turn this off any time.</p>
       <div class="act"><button class="switch${profile.shareLocation ? ' on' : ''}" data-share aria-label="Share my location with friends" role="switch" aria-checked="${profile.shareLocation}"></button></div></div>`;
@@ -158,7 +158,7 @@ const acct = document.createElement('div'); acct.className = 'acct'; acct.id = '
 document.body.append(ob, acct);
 
 const dots = n => `<div class="ob-dots">${[1, 2, 3].map(i => `<i class="${i === n ? 'on' : ''}"></i>`).join('')}</div>`;
-const brand = `<div class="ob-brand"><div class="mark"><img src="icon-192.png" alt=""></div><h1>skiLink</h1><p>Find your friends on the mountain and the quickest way to meet them.</p></div>`;
+const brand = `<div class="ob-brand"><img class="ob-appicon sm" src="icon-192.png" alt=""></div>`;
 const homeOptions = sel => {
   const opt = (id, label) => `<option value="${id}"${id === sel ? ' selected' : ''}>${esc(label)}</option>`;
   return `<option value="">Choose later</option>` +
@@ -169,10 +169,17 @@ const deviceNote = CLOUD ? '' : `<div class="ob-note">For now your account is sa
 
 async function render(){
   let h = '';
-  if (step === 'welcome') h = brand + `<div class="ob-card">
-      <h2>Welcome 👋</h2><p class="lead">Create an account to share your location with friends, keep your stats on the leaderboard and meet up faster.</p>
+  if (step === 'welcome') h = `<div class="ob-hello">
+      <img class="ob-appicon" src="icon-192.png" alt="">
+      <h1>Welcome to skiLink</h1>
+      <ul class="ob-feats">
+        <li><span class="fi" style="--c:var(--tint)">${ICON.people}</span><div><b>See your friends live</b><p>Everyone on one piste map, with their speed and what they’re riding.</p></div></li>
+        <li><span class="fi" style="--c:var(--indigo)">${ICON.route}</span><div><b>Meet up the quickest way</b><p>Routes over lifts and runs, matched to your ski level.</p></div></li>
+        <li><span class="fi" style="--c:var(--green)">${GLYPH.lift}</span><div><b>Live lift status</b><p>Closed lifts and runs are left out of your route automatically.</p></div></li>
+      </ul></div>
+    <div class="ob-actions">
       <button class="ob-btn primary" data-go="signup">Create account</button>
-      <button class="ob-btn ghost" data-go="signin">I already have an account</button>
+      <button class="ob-btn ghost" data-go="signin">Sign in</button>
       <button class="ob-btn link" data-act="guest">Try it without an account</button></div>`;
   else if (step === 'signup') h = brand + `<div class="ob-card">${dots(1)}
       <h2>Create your account</h2><p class="lead">It takes about a minute.</p>${deviceNote}
@@ -231,7 +238,7 @@ async function render(){
   else if (step === 'perms') h = brand + `<div class="ob-card">${dots(3)}
       <h2>Permissions</h2><p class="lead">skiLink needs a couple of things from your phone to work on the mountain. You can change these later.</p>
       <div id="obPerms">${await permCards(draft)}</div>
-      <button class="ob-btn primary" data-act="finish">Start skiing ⛷</button>
+      <button class="ob-btn primary" data-act="finish">Start skiing</button>
       <p class="ob-hint" style="text-align:center;margin-top:10px">Without location you can still place yourself on the map by hand.</p></div>`;
   ob.innerHTML = `<div class="ob-wrap">${h}</div>`;
   const f = ob.querySelector('input[name=name], input[name=email]');
