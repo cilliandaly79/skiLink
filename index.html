@@ -33,7 +33,7 @@
   /* wintry tint on the topo map */
   #map.topo .leaflet-tile-pane{filter:saturate(.45) brightness(1.1) contrast(.92) hue-rotate(-8deg)}
   #map.sat .leaflet-tile-pane{filter:saturate(.85) brightness(1.04)}
-  #snow{position:absolute;inset:0;pointer-events:none;z-index:650}
+  #snow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:650}   /* explicit size: a canvas otherwise takes its CSS size from its pixel size */
   .frost-edge{position:absolute;inset:0;pointer-events:none;z-index:640;box-shadow:inset 0 0 90px rgba(225,240,252,.9)}
 
   /* floating map UI: frosted glass */
@@ -1399,18 +1399,21 @@ document.getElementById('bLayer').onclick = e => {
 
 /* gentle snowfall over the map */
 const snowC = document.getElementById('snow'), sctx = snowC.getContext('2d');
-let snowOn = true, flakes = [];
+let snowOn = true, flakes = [], snowW = 0, snowH = 0;
+// size the canvas to the map (capped), only when the map's size really changes; free it while snow is off
 function sizeSnow(){
-  const r = snowC.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
-  snowC.width = r.width * dpr; snowC.height = r.height * dpr; sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const n = Math.round(r.width * r.height / 9000);
-  flakes = Array.from({length:n}, () => ({x:Math.random() * r.width, y:Math.random() * r.height, r:0.8 + Math.random() * 2.2, s:12 + Math.random() * 28, w:Math.random() * 6.28, o:0.45 + Math.random() * 0.45}));
+  const m = document.getElementById('mapWrap'), w = Math.min(m.clientWidth, 2000), h = Math.min(m.clientHeight, 2000);
+  if (!snowOn){ if (snowC.width){ snowC.width = 0; snowC.height = 0; snowW = snowH = 0; } return; }
+  if (w === snowW && h === snowH) return;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  snowW = w; snowH = h; snowC.width = Math.round(w * dpr); snowC.height = Math.round(h * dpr); sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  flakes = Array.from({length:Math.round(w * h / 9000)}, () => ({x:Math.random() * w, y:Math.random() * h, r:0.8 + Math.random() * 2.2, s:12 + Math.random() * 28, w:Math.random() * 6.28, o:0.45 + Math.random() * 0.45}));
 }
-new ResizeObserver(sizeSnow).observe(snowC);
+new ResizeObserver(sizeSnow).observe(document.getElementById('mapWrap'));
 function drawSnow(dt){
-  const W = snowC.clientWidth, H = snowC.clientHeight;
+  if (!snowOn || !snowW) return;
+  const W = snowW, H = snowH;
   sctx.clearRect(0, 0, W, H);
-  if (!snowOn) return;
   for (const f of flakes){
     f.y += f.s * dt; f.w += dt * 0.8; f.x += Math.sin(f.w) * 0.35;
     if (f.y > H + 4){ f.y = -4; f.x = Math.random() * W; }
@@ -1419,7 +1422,7 @@ function drawSnow(dt){
     sctx.lineWidth = 0.7; sctx.strokeStyle = `rgba(95,140,190,${f.o * 0.45})`; sctx.stroke();
   }
 }
-document.getElementById('bSnow').onclick = e => { snowOn = !snowOn; e.currentTarget.classList.toggle('on', snowOn); };
+document.getElementById('bSnow').onclick = e => { snowOn = !snowOn; e.currentTarget.classList.toggle('on', snowOn); sizeSnow(); };
 document.getElementById('bPlace').onclick = e => {
   ui.placing = !ui.placing; e.currentTarget.classList.toggle('on', ui.placing);
   if (ui.placing) toast('Tap the map where you are');
@@ -1468,7 +1471,7 @@ function applyLayout(){
   document.body.classList.toggle('mobile', m);
   if (m && hero.parentNode !== mapWrap) mapWrap.appendChild(hero);
   if (!m && hero.parentNode !== panel) panel.insertBefore(hero, document.getElementById('tabs'));
-  if (!layoutInit && m){ snowOn = false; document.getElementById('bSnow').classList.remove('on'); }   // save battery on phones
+  if (!layoutInit && m){ snowOn = false; document.getElementById('bSnow').classList.remove('on'); sizeSnow(); }   // save battery on phones
   layoutInit = true;
   map.invalidateSize({pan:false});
   setSheet(ui.sheet);
