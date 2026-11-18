@@ -10,6 +10,11 @@ const available = () => !!(sb() && sess() && !sess().guest && sess().id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
 const initialsOf = n => (n || '').trim().split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
 const RANK_OF = {beginner:2, intermediate:3, advanced:4, expert:5};
+// other people's profile fields go into HTML, so keep them to safe characters/values
+const cleanText = (t, max) => String(t ?? '').replace(/[<>&"`]/g, '').replace(/'/g, '’').trim().slice(0, max);
+const cleanColor = c => /^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#007aff';
+const cleanUser = u => /^[a-z0-9_.]{3,20}$/.test(u || '') ? u : '';
+const cleanPerson = p => ({...p, display_name:cleanText(p.display_name, 40), username:cleanUser(p.username), color:cleanColor(p.color)});
 const USERNAME = /^[a-z0-9_.]{3,20}$/;
 const today = () => new Date().toLocaleDateString('en-CA');        // YYYY-MM-DD, local day
 const STALE_MS = 10 * 60 * 1000;
@@ -48,8 +53,39 @@ async function loadFriendships(){
   const ids = [...new Set(rows.flatMap(r => [r.requester, r.addressee]))].filter(id => id !== sess().id);
   if (ids.length){
     const {data:ps} = await sb().from('profiles').select('id,username,display_name,color,skill').in('id', ids);
-    (ps || []).forEach(p => people.set(p.id, p));
+    (ps || []).forEach(p => people.set(p.id, cleanPerson(p)));
   }
+}
+let seenIncoming = null;
+function announce(){
+  const uid = sess() && sess().id;
+  const incoming = uid ? rows.filter(r => r.status === 'pending' && r.addressee === uid) : [];
+  if (seenIncoming){
+    incoming.filter(r => !seenIncoming.has(r.id)).forEach(r => {
+      const p = people.get(r.requester) || {}, who = p.display_name || '@' + (p.username || 'someone');
+      toast(`${who} wants to be friends`);
+      if ('Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible')
+        navigator.serviceWorker && navigator.serviceWorker.ready.then(reg => reg.showNotification('New friend request', {body:`${who} wants to be friends on skiLink`, icon:'icon-192.png', tag:'sk-req-' + r.id}));
+    });
+  }
+  seenIncoming = new Set(incoming.map(r => r.id));
+  dispatchEvent(new CustomEvent('skilink:friends'));
+}
+function requests(){
+  const uid = sess() && sess().id; if (!uid) return {incoming:[], outgoing:[]};
+  const wrap = r => ({id:r.id, at:r.created_at, person:people.get(r.requester === uid ? r.addressee : r.requester) || {}});
+  return {incoming:rows.filter(r => r.status === 'pending' && r.addressee === uid).map(wrap),
+          outgoing:rows.filter(r => r.status === 'pending' && r.requester === uid).map(wrap)};
+}
+async function accept(id){
+  const {error} = await sb().from('friendships').update({status:'accepted'}).eq('id', +id);
+  if (error) throw error;
+  await loadFriendships(); await loadLive(); syncFriends(); announce();
+}
+async function decline(id){
+  const {error} = await sb().from('friendships').delete().eq('id', +id);
+  if (error) throw error;
+  await loadFriendships(); await loadLive(); syncFriends(); announce();
 }
 const friendIds = () => rows.filter(r => r.status === 'accepted').map(r => r.requester === sess().id ? r.addressee : r.requester);
 async function loadLive(){
@@ -76,11 +112,11 @@ function syncFriends(){
     Object.assign(f, {
       real:true, name:p.display_name || p.username || 'Friend', username:p.username, color:p.color || '#007aff',
       initials:initialsOf(p.display_name || p.username), maxRank:RANK_OF[p.skill] || 3,
-      stats:{top:st ? st.top_speed : 0, vert:st ? st.vertical : 0, runs:st ? st.runs : 0, dist:st ? st.distance : 0},
+      stats:{top:st ? +st.top_speed || 0 : 0, vert:st ? +st.vertical || 0 : 0, runs:st ? +st.runs || 0 : 0, dist:st ? +st.distance || 0 : 0},
     });
     if (l){
       const seen = Date.parse(l.updated_at), speed = (l.speed_kmh || 0) / 3.6;
-      Object.assign(f, {lat:l.lat, lon:l.lon, alt:l.altitude, speed, seen, stale:Date.now() - seen > STALE_MS, statusText:l.status || '',
+      Object.assign(f, {lat:+l.lat, lon:+l.lon, alt:l.altitude == null ? null : +l.altitude, speed, seen, stale:Date.now() - seen > STALE_MS, statusText:cleanText(l.status, 30),
         state: /riding|lift/i.test(l.status || '') ? 'riding' : speed > 2 ? 'skiing' : 'idle'});
       if (f.stale) f.speed = 0;
       if (G) snapReal(f);
@@ -157,7 +193,7 @@ async function stopSharing(){ if (available()) await sb().from('live_locations')
 async function start(){
   if (!available()){ stop(); return; }
   try {
-    await ensureProfile(); await loadFriendships(); await loadLive(); syncFriends();
+    await ensureProfile(); await loadFriendships(); await loadLive(); syncFriends(); announce();
   } catch (e){
     console.warn('friends', e);
     if (/relation .* does not exist|schema cache/i.test(e.message || '')) toast('Friends aren’t set up on the server yet (run supabase/schema.sql)');
@@ -166,7 +202,7 @@ async function start(){
   started = true;
   clearInterval(pollTimer); clearInterval(slowTimer);
   pollTimer = setInterval(async () => { if (document.visibilityState !== 'visible') return; try { await loadLive(); syncFriends(); } catch {} }, 15000);
-  slowTimer = setInterval(async () => { if (document.visibilityState !== 'visible') return; try { await loadFriendships(); syncFriends(); if (sheet.classList.contains('show')) render(); } catch {} }, 60000);
+  slowTimer = setInterval(async () => { try { await loadFriendships(); syncFriends(); announce(); if (sheet.classList.contains('show')) render(); } catch {} }, 20000);
   const prof = sess().profile || {};
   if (prof.shareLocation && navigator.permissions){
     try { if ((await navigator.permissions.query({name:'geolocation'})).state === 'granted') startGps(); } catch { startGps(); }
@@ -174,7 +210,7 @@ async function start(){
   if (pendingAdd){ open(); }
 }
 function stop(){
-  clearInterval(pollTimer); clearInterval(slowTimer); started = false; me = null; rows = []; people.clear();
+  clearInterval(pollTimer); clearInterval(slowTimer); started = false; me = null; rows = []; people.clear(); seenIncoming = null; announce();
   if (ui.friendMode === 'real') setFriends([], 'none');
 }
 addEventListener('skilink:session', () => { start(); });
@@ -232,14 +268,14 @@ async function addByName(raw){
   if (me && u === me.username) return say('That’s you!', 'bad');
   const {data, error} = await sb().rpc('find_user', {uname:u});
   if (error) return say(error.message, 'bad');
-  const p = data && data[0];
+  const p = data && data[0] && cleanPerson(data[0]);
   if (!p) return say(`No skier called @${u}. Check the spelling, or send them your invite link.`, 'bad');
   people.set(p.id, p);
   const existing = rows.find(r => (r.requester === p.id || r.addressee === p.id));
   if (existing) return say(existing.status === 'accepted' ? `You’re already friends with ${p.display_name || '@' + u}.` : `There’s already a request between you and @${u}.`, '');
   const {error:e2} = await sb().from('friendships').insert({requester:sess().id, addressee:p.id});
   if (e2) return say(e2.message, 'bad');
-  await loadFriendships();
+  await loadFriendships(); announce();
   say(`Request sent to ${p.display_name || '@' + u}. They’ll appear once they accept.`, 'ok');
 }
 sheet.addEventListener('submit', async e => {
@@ -263,13 +299,13 @@ sheet.addEventListener('click', async e => {
     b.disabled = true;
     const {error} = await sb().from('friendships').update({status:'accepted'}).eq('id', +b.dataset.id);
     if (error) return say(error.message, 'bad');
-    await loadFriendships(); await loadLive(); syncFriends(); say('Friend added', 'ok');
+    await loadFriendships(); await loadLive(); syncFriends(); announce(); say('Friend added', 'ok');
   } else if (f === 'remove'){
     if (b.dataset.name && !confirm(`Remove ${b.dataset.name} from your friends? You’ll stop seeing each other.`)) return;
     b.disabled = true;
     const {error} = await sb().from('friendships').delete().eq('id', +b.dataset.id);
     if (error) return say(error.message, 'bad');
-    await loadFriendships(); await loadLive(); syncFriends(); say('', '');
+    await loadFriendships(); await loadLive(); syncFriends(); announce(); say('', '');
   }
 });
 addEventListener('keydown', e => { if (e.key === 'Escape') sheet.classList.remove('show'); });
@@ -282,6 +318,6 @@ addEventListener('keydown', e => { if (e.key === 'Escape') sheet.classList.remov
   q.delete('add'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
 })();
 
-window.skiLinkFriends = {available, open, setUsername, get me(){ return me; }, start, stopSharing, startGps};
+window.skiLinkFriends = {available, open, setUsername, get me(){ return me; }, start, stopSharing, startGps, requests, accept, decline};
 start();
 })();

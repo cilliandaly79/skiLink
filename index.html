@@ -260,6 +260,7 @@
   .livedot{width:8px;height:8px;border-radius:50%;background:#fca5a5;display:inline-block}
   .livedot.on{background:#7dffb0;box-shadow:0 0 0 3px rgba(125,255,176,.3)}
   .fr-head{display:flex;align-items:center;justify-content:space-between}
+  .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--red);color:#fff;font-size:11.5px;font-weight:700;letter-spacing:0;vertical-align:1px}
   .linkbtn{border:0;background:none;color:var(--tint);font-weight:600;font-size:14px;text-transform:none;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:6px;padding:4px 0}
   .linkbtn svg{width:18px;height:18px}
   .empty{text-align:center;padding:22px 18px}
@@ -1401,6 +1402,7 @@ function renderFriends(){
     <div class="card friend" data-row="you">${avatar(you)}
       <div><div class="name">You</div><div class="status" data-f="status"></div></div>
       <div class="speed"><b data-f="speed">0</b><small>km/h</small></div></div>
+    ${requestsSection()}
     <div class="section-title fr-head"><span>Friends · ${friends.length}</span><button class="linkbtn" data-action="addfriends">${ICON.people} Add friends</button></div>
     ${friends.length ? '' : `<div class="card empty"><div class="empty-ic">${ICON.people}</div><b>${ui.friendMode === 'none' ? 'Ski with your friends' : 'No friends yet'}</b>
       <p>${window.skiLinkFriends && skiLinkFriends.available() ? 'Add friends by username or send them an invite link. Only friends you add can see you, and only they show up here and on your leaderboard.' : 'Create an account to add friends. Only friends you add can see you, and only they show up here and on your leaderboard.'}</p>
@@ -1419,6 +1421,35 @@ function renderFriends(){
     <p class="hint">Tap ⌖ to use your GPS at the resort, or 📍 then tap the map to place yourself.</p>`;
   updateFriends();
 }
+// incoming requests to accept/decline, plus the ones you've sent
+function requestsSection(){
+  const R = window.skiLinkFriends && skiLinkFriends.available() ? skiLinkFriends.requests() : {incoming:[], outgoing:[]};
+  if (!R.incoming.length && !R.outgoing.length) return '';
+  const ini = p => (p.display_name || p.username || '?').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const who = (r, sub, acts) => `<div class="fr-row"><div class="avatar sm" style="background:${r.person.color || '#007aff'}">${ini(r.person)}</div>
+    <div class="fr-who"><b>${(r.person.display_name || r.person.username || 'Skier').replace(/[<>&]/g, '')}</b><small>@${r.person.username || ''} · ${sub}</small></div><div class="fr-acts">${acts}</div></div>`;
+  return (R.incoming.length ? `<div class="section-title">Friend requests · ${R.incoming.length}</div>
+      <div class="card fr-list">${R.incoming.map(r => who(r, `asked ${agoShort(Date.parse(r.at))}`,
+        `<button class="pill ok" data-action="req-accept" data-id="${r.id}">Accept</button><button class="pill" data-action="req-decline" data-id="${r.id}">Decline</button>`)).join('')}</div>` : '')
+    + (R.outgoing.length ? `<div class="section-title">Waiting for them · ${R.outgoing.length}</div>
+      <div class="card fr-list">${R.outgoing.map(r => who(r, `sent ${agoShort(Date.parse(r.at))}`,
+        `<button class="pill" data-action="req-decline" data-id="${r.id}">Cancel</button>`)).join('')}</div>` : '');
+}
+// red count on the Friends tab when someone has asked
+function paintRequestBadge(){
+  const n = window.skiLinkFriends && skiLinkFriends.available() ? skiLinkFriends.requests().incoming.length : 0;
+  const tab = document.querySelector('#tabs [data-tab=friends]');
+  tab.innerHTML = 'Friends' + (n ? `<span class="badge" aria-label="${n} friend request${n === 1 ? '' : 's'}">${n}</span>` : '');
+}
+let reqSig = '';
+addEventListener('skilink:friends', () => {
+  paintRequestBadge();
+  const R = window.skiLinkFriends && skiLinkFriends.available() ? skiLinkFriends.requests() : {incoming:[], outgoing:[]};
+  const sig = R.incoming.map(r => r.id).join() + '|' + R.outgoing.map(r => r.id).join();
+  if (sig === reqSig) return;
+  reqSig = sig;
+  if (G && ui.view === 'tabs' && ui.tab === 'friends') renderFriends();
+});
 function updateFriends(){
   skiers.forEach(sk => {
     const row = content.querySelector(`[data-row="${sk.id}"]`); if (!row) return;
@@ -1614,6 +1645,12 @@ content.addEventListener('click', e => {
   else if (a === 'pick') pickOption(+b.dataset.k);
   else if (a === 'addfriends'){ if (window.skiLinkFriends) skiLinkFriends.open(); }
   else if (a === 'demo') useDemoFriends(ui.friendMode !== 'demo');
+  else if (a === 'req-accept' || a === 'req-decline'){
+    b.disabled = true;
+    (a === 'req-accept' ? skiLinkFriends.accept(b.dataset.id) : skiLinkFriends.decline(b.dataset.id))
+      .then(() => toast(a === 'req-accept' ? 'Friend added' : 'Request removed'))
+      .catch(x => { b.disabled = false; toast('Couldn’t update the request: ' + x.message); });
+  }
   else if (a === 'sim'){ ui.sim = +b.dataset.v; content.querySelectorAll('[data-action=sim]').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('[data-sim]').forEach(x => x.classList.toggle('on', +x.dataset.sim === ui.sim)); }
   else if (a === 'go') startNav();
   else if (a === 'cancel') stopNav('Navigation ended');
