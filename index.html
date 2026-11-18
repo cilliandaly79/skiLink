@@ -16,6 +16,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="account.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
@@ -1808,7 +1809,7 @@ async function loadResort(resort){
     const pre = buildGraph(osm, resort.bbox);
     if (!pre){ setLoading(); toast('No ski runs or lifts mapped in this area'); return; }
     SCHEME = (pre.lon0 < -30 && pre.lon0 > -170) ? SCHEMES.na : SCHEMES.eu;
-    ui.maxRank = 5;
+    ui.maxRank = window.PREF_RANK || 5;   // your ski level from your profile
     // elevation is needed only for graph nodes (junctions & ends)
     const ids = new Set();
     pre.ways.forEach(w => w.nodes.forEach((id, i) => { if (pre.split.has(id)) ids.add(id); }));
@@ -1914,5 +1915,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   else { sel.value = RESORTS[0].id; loadResort(RESORTS[0]); }
 })();
 </script>
+<script src="config.js"></script>
+<script src="account.js"></script>
 </body>
 </html>

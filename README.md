@@ -10,6 +10,7 @@ lift + run routes to meet up (Easiest / Balanced / Fastest), with live open/clos
 | Path | What it is |
 |---|---|
 | `index.html` | The whole app (Leaflet map, routing, UI). Installable on phones (PWA). |
+| `account.js`, `account.css`, `config.js` | Sign up / sign in, profile, permissions, account menu |
 | `sw.js`, `manifest.webmanifest`, `icon*` | Offline support + home-screen install |
 | `data/<resort>.json` | Pre-downloaded runs & lifts from OpenStreetMap for the preset resorts |
 | `server.py` | Local dev server: serves the app + live status at `/api/status/<resort>` |
@@ -25,6 +26,19 @@ python server.py
 ```
 
 Then open http://localhost:5174. (Python 3.10+, no packages needed.)
+
+## Accounts
+
+First launch shows a welcome screen: **create an account**, **sign in**, or **try without an account**,
+then profile setup (name, colour, ski level, home resort) and a permissions screen
+(location, notifications, and opt-in location sharing with friends). The avatar button opens the
+account menu (edit profile, permissions, sign out, delete).
+
+- **Now:** accounts are saved on each phone only (passwords hashed with PBKDF2, never stored).
+- **Real accounts on any device:** create a free project at [supabase.com](https://supabase.com), then put its
+  Project URL and *anon public* key in `config.js` (Project Settings → API) and push. Sign-up, sign-in,
+  password reset and profiles then work through Supabase Auth. In Supabase, set
+  Authentication → URL Configuration → Site URL to `https://cilliandaly79.github.io/skiLink/`.
 
 ## Live lift & run status
 

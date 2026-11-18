@@ -4,8 +4,8 @@
    - map tiles you've looked at: cached (up to ~3000), so the map still shows offline
    - weather / elevation: network first, cached copy if offline
    Bump VERSION when index.html changes so phones pick up the new app. */
-const VERSION = 'pistemap-v3';
-const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
+const VERSION = 'pistemap-v5';
+const SHELL = ['./', 'index.html', 'account.js', 'account.css', 'config.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'];
 const TILE_HOSTS = ['tile.opentopomap.org', 'server.arcgisonline.com'];
@@ -64,7 +64,9 @@ self.addEventListener('fetch', e => {
     return;   // live map queries: always network
   } else if (req.mode === 'navigate' || (url.origin === location.origin && /\.(html|webmanifest)$|\/$/.test(url.pathname))){
     e.respondWith(networkFirst(req, VERSION));   // newest app when online, cached app when not
-  } else if (url.origin === location.origin || url.hostname.endsWith('cdnjs.cloudflare.com') || url.hostname.includes('fonts.g')){
+  } else if (url.origin === location.origin){
+    e.respondWith(networkFirst(req, VERSION));   // app's own scripts/styles: newest when online, cached when offline
+  } else if (url.hostname.endsWith('cdnjs.cloudflare.com') || url.hostname.includes('fonts.g') || url.hostname.endsWith('jsdelivr.net')){
     // app shell: serve cached copy, refresh in background
     e.respondWith(cacheFirst(req, VERSION, true));
   }
