@@ -1756,7 +1756,7 @@ function renderPicker(){
 }
 function openPicker(){
   pkSearch.value = ''; renderPicker();
-  picker.classList.add('shown'); requestAnimationFrame(() => requestAnimationFrame(() => picker.classList.add('open')));
+  picker.classList.add('shown'); setTimeout(() => picker.classList.add('open'), 20);
   if (!isMobile()) setTimeout(() => pkSearch.focus(), 50);
 }
 function closePicker(){
