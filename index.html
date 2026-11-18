@@ -259,6 +259,19 @@
   @keyframes livep{50%{box-shadow:0 0 0 7px rgba(34,197,94,.05)}}
   .livedot{width:8px;height:8px;border-radius:50%;background:#fca5a5;display:inline-block}
   .livedot.on{background:#7dffb0;box-shadow:0 0 0 3px rgba(125,255,176,.3)}
+  .fr-head{display:flex;align-items:center;justify-content:space-between}
+  .linkbtn{border:0;background:none;color:var(--tint);font-weight:600;font-size:14px;text-transform:none;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:6px;padding:4px 0}
+  .linkbtn svg{width:18px;height:18px}
+  .empty{text-align:center;padding:22px 18px}
+  .empty .empty-ic{width:52px;height:52px;margin:0 auto 10px;border-radius:14px;background:color-mix(in srgb,var(--tint) 12%,transparent);color:var(--tint);display:grid;place-items:center}
+  .empty .empty-ic svg{width:30px;height:30px}
+  .empty b{display:block;font-size:17px;letter-spacing:-.02em}
+  .empty p{color:var(--label2);font-size:14px;margin:6px 0 14px}
+  .democard .switch{flex:none}
+  .switch{position:relative;width:51px;height:31px;border-radius:999px;background:var(--fill2);border:0;padding:0;flex:none}
+  .switch::after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15);transition:left .25s var(--ease-out)}
+  .switch.on{background:var(--green)}
+  .switch.on::after{left:22px}
   .err{background:#fff0f0;border:1px solid #ffd0d0;color:#9b1c1c;border-radius:14px;padding:12px;font-size:13px}
   .src{color:var(--muted);font-size:11.5px;padding:8px 4px}
 
@@ -962,32 +975,55 @@ const edgeName = e => e.kind === 'link' ? 'short traverse' : e.name || (e.kind =
    SKIERS (simulated friends — the real app would stream GPS positions)
    ========================================================================= */
 const mkStats = (top, vert, runs, km) => ({top, vert, runs, dist: km * 1000});
-const you = {id:'you', name:'You', initials:'ME', color:'#1a73e8', isYou:true, maxRank:5, factor:1, navQueue:[], stats:mkStats(66.1, 5320, 13, 17.4)};
-const friends = [
+const you = {id:'you', name:'You', initials:'ME', color:'#1a73e8', isYou:true, maxRank:5, factor:1, navQueue:[], stats:mkStats(0, 0, 0, 0)};
+const DEMO_STATS = mkStats(66.1, 5320, 13, 17.4);
+const DEMO_FRIENDS = [
   {id:'maya',  name:'Maya',  color:'#e4572e', maxRank:5, factor:1.15, stats:mkStats(78.4, 7420, 17, 21.3)},
   {id:'leo',   name:'Leo',   color:'#7b2cbf', maxRank:4, factor:1.05, stats:mkStats(71.2, 6980, 15, 19.8)},
   {id:'priya', name:'Priya', color:'#e09f3e', maxRank:5, factor:1.10, stats:mkStats(74.9, 5900, 14, 16.9)},
   {id:'sam',   name:'Sam',   color:'#0a9396', maxRank:3, factor:0.92, stats:mkStats(58.3, 4870, 12, 15.2)},
   {id:'jonah', name:'Jonah', color:'#3a86ff', maxRank:2, factor:0.78, stats:mkStats(39.5, 2210,  9,  8.6)},
 ];
-friends.forEach(f => Object.assign(f, {initials: f.name.slice(0, 2).toUpperCase(), phase: Math.random() * 6}));
-const skiers = [you, ...friends];
+DEMO_FRIENDS.forEach(f => Object.assign(f, {initials: f.name.slice(0, 2).toUpperCase(), phase: Math.random() * 6, demo:true}));
+// friends = only the people you've added (friends.js), or the demo skiers if you switch them on
+const friends = [], skiers = [you];
+function setFriends(list, mode){
+  const keep = new Set(list.map(f => f.id));
+  friends.forEach(f => { if (!keep.has(f.id) && f.marker){ f.marker.remove(); f.marker = null; } });
+  friends.length = 0; friends.push(...list);
+  skiers.length = 1; skiers.push(...friends);
+  if (mode) ui.friendMode = mode;
+  if (ui.friendMode === 'demo'){ if (!you.realStats) you.stats = Object.assign({}, DEMO_STATS); }
+  if (G){ placeSkiers(true); makeMarkers(); renderQuick(); updateMarkers(); if (ui.view !== 'route') renderPanel(); }
+}
+function useDemoFriends(on){
+  setFriends(on ? DEMO_FRIENDS : [], on ? 'demo' : 'none');
+  if (!on && !you.realStats) you.stats = mkStats(0, 0, 0, 0);
+  if (G) renderPanel();
+}
 const byId = id => skiers.find(s => s.id === id);
 const pick = a => a[Math.floor(Math.random() * a.length)];
 
-function placeSkiers(){
+function placeSkiers(onlyFriends){
   const main = G.edges.filter(e => e.main && e.kind !== 'link');
-  friends.forEach(f => {
+  friends.filter(f => !f.real && (!onlyFriends || !f.edge || !G.edges.includes(f.edge))).forEach(f => {
     const ok = main.filter(e => e.kind === 'lift' || e.rank <= f.maxRank);
     const e = pick(ok.length ? ok : main);
     Object.assign(f, {edge:e, node:e.from, d:Math.random() * e.length * 0.8, speed: e.kind === 'lift' ? e.speed : 8,
       state: e.kind === 'lift' ? 'riding' : 'skiing', t: Math.random() * 100, burst: 0, holdAt: null, prevNode: null, lastWay: e.wayId});
   });
+  friends.filter(f => f.real).forEach(snapReal);
+  if (onlyFriends && you.node != null && G.nodes.has(you.node)) return;
   // you start at the lowest lift station (usually the base area)
   const bases = main.filter(e => e.kind === 'lift' && !e.down).sort((a, b) => (a.eleA ?? 0) - (b.eleA ?? 0));
   Object.assign(you, {edge:null, node: bases.length ? bases[0].from : main[0].from, d:0, speed:0, state:'idle', t:0, burst:0, navQueue:[], lastWay:null});
 }
 
+function snapReal(f){
+  if (!G || f.lat == null) return;
+  const n = nearestMainNode(f.lat, f.lon);
+  f.node = n.id; f.edge = null; f.offMap = n.meters > 3000;
+}
 function allowed(sk, e){ return (e.kind !== 'run' || e.rank <= sk.maxRank) && !(e.shut && G.live && G.live.enforce); }
 
 function startEdge(sk, e){
@@ -1021,6 +1057,7 @@ function chooseNext(sk){
 }
 
 function step(sk, dt){
+  if (sk.real || (sk.isYou && sk.gps)) return;   // real people move on their own (GPS), not by simulation
   sk.t += dt;
   if (sk.state === 'idle' || sk.state === 'waiting'){ sk.speed = 0; return; }
   if (sk.state === 'queue'){ sk.speed = 0; sk.queueLeft -= dt; if (sk.queueLeft <= 0) sk.state = 'riding'; return; }
@@ -1053,6 +1090,7 @@ function arrive(sk){
 }
 
 function remainingOnEdge(sk){
+  if (sk.real) return 0;
   const e = sk.edge; if (!e) return 0;
   if (e.kind === 'lift') return (sk.state === 'queue' ? sk.queueLeft : 0) + (e.length - sk.d) / e.speed;
   return (e.length - sk.d) / (e.kind === 'link' ? (e.walk ? 1.2 : 2) : runSpeed(e, sk.factor));
@@ -1061,10 +1099,11 @@ function remainingOnEdge(sk){
 /* =========================================================================
    NAVIGATION TO A FRIEND
    ========================================================================= */
-const ui = {tab:'friends', view:'tabs', routeFriend:null, route:null, nav:null, maxRank:5, lbMetric:'top', sim:5, selected:null, routeSig:'', placing:false};
+const ui = {friendMode:'none' /* 'real' | 'demo' | 'none' */, tab:'friends', view:'tabs', routeFriend:null, route:null, nav:null, maxRank:5, lbMetric:'top', sim:5, selected:null, routeSig:'', placing:false};
 
 function planRoute(f){
-  const meet = f.state === 'waiting' ? f.node : (f.holdAt || (f.edge ? f.edge.to : f.node));
+  if (f.real && (f.lat == null || f.offMap || f.node == null)) return {error:true, meet:you.node, friendEta:0, start:you.node, options:[], reason: f.lat == null ? `${f.name} isn’t sharing their location right now.` : `${f.name} isn’t at this resort.`};
+  const meet = f.real ? f.node : f.state === 'waiting' ? f.node : (f.holdAt || (f.edge ? f.edge.to : f.node));
   const friendEta = f.state === 'waiting' ? 0 : remainingOnEdge(f);
   const start = you.edge ? you.edge.to : you.node, pre = remainingOnEdge(you);
   // one candidate per difficulty limit: the fastest way using only runs up to that level
@@ -1103,10 +1142,10 @@ function startNav(){
   const f = ui.routeFriend, r = ui.route;
   if (!r || r.error) return;
   ui.nav = {friend:f, meet:r.meet, optName:r.pick.name, hardest:r.pick.hardest};
-  f.holdAt = r.meet;
+  if (!f.real) f.holdAt = r.meet;
   you.navQueue = r.edges.slice();
   if (!you.edge && you.navQueue.length) startEdge(you, you.navQueue.shift());
-  toast(`📍 Asked ${f.name} to wait for you at the ${nodeLabel(r.meet)}`);
+  toast(f.real ? `Heading to ${f.name} — the route follows them if they move` : `Asked ${f.name} to wait for you at the ${nodeLabel(r.meet)}`);
   askNotify().then(ok => { if (!ok) toast(`Tip: allow notifications to see your progress to ${f.name} from your lock screen`); updateBanner(); });
   updateBanner(); setSheet('peek'); setTimeout(fitRoute, 350);
   ui.routeSig = ''; renderPanel(); drawRoute(); checkMeet();
@@ -1123,7 +1162,7 @@ function stopNav(msg){
 function checkMeet(){
   const n = ui.nav; if (!n) return;
   const f = n.friend;
-  if (!you.edge && you.node === n.meet && f.state === 'waiting' && f.node === n.meet) stopNav(`🎉 You met up with ${f.name} at the ${nodeLabel(n.meet)}!`);
+  if (!you.edge && you.node === n.meet && (f.real || (f.state === 'waiting' && f.node === n.meet))) stopNav(`🎉 You met up with ${f.name} at the ${nodeLabel(n.meet)}!`);
 }
 
 /* =========================================================================
@@ -1219,18 +1258,26 @@ function makeMarkers(){
   });
 }
 function skierPos(sk){
+  if (sk.real) return sk.lat != null ? [sk.lat, sk.lon] : null;
+  if (sk.isYou && sk.gps && !sk.edge) return [sk.gps.lat, sk.gps.lon];
   if (sk.edge && sk.state !== 'queue') return posAt(sk.edge, sk.d);
   if (sk.edge) return sk.edge.pts[0];
   const n = G.nodes.get(sk.node); return [n.lat, n.lon];
 }
 function skierEle(sk){
+  if (sk.real) return sk.alt ?? (sk.node != null && G.nodes.get(sk.node) ? G.nodes.get(sk.node).ele : null);
+  if (sk.isYou && sk.gps && sk.gps.alt != null && !sk.edge) return sk.gps.alt;
   if (sk.edge) return eleAt(sk.edge, sk.state === 'queue' ? 0 : sk.d);
   return G.nodes.get(sk.node).ele;
 }
 function updateMarkers(){
   skiers.forEach(sk => {
-    const p = skierPos(sk), dLon = sk.lon == null ? 0 : p[1] - sk.lon;
-    sk.lat = p[0]; sk.lon = p[1];
+    if (!sk.marker) return;
+    const p = skierPos(sk);
+    if (!p){ sk.marker.setOpacity(0); return; }   // a friend who isn't sharing their location
+    sk.marker.setOpacity(sk.real && sk.stale ? .55 : 1);
+    const dLon = sk.lon == null || sk.real ? 0 : p[1] - sk.lon;
+    if (!sk.real){ sk.lat = p[0]; sk.lon = p[1]; }
     sk.marker.setLatLng(p);
     if (!sk.isYou){
       const moving = sk.state === 'skiing' && sk.speed > 1;
@@ -1320,7 +1367,14 @@ function diffIcon(rank, s = 14){
 const liftIcon = (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 3 15 1"/><path d="M8 2v5"/><path d="M4 7h8v4H4z"/><path d="M4 11v3M12 11v3"/></svg>`;
 const avatar = (sk, sm) => `<div class="avatar${sm ? ' sm' : ''}" style="background:${sk.color}" title="${sk.name}">${sk.isYou ? sk.initials : GLYPH.ski}</div>`;
 
+const agoShort = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'now' : m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
 function statusHTML(sk){
+  if (sk.real){
+    if (sk.lat == null) return 'Not sharing location';
+    if (sk.offMap) return `Not at this resort · ${agoShort(sk.seen)}`;
+    const lbl = nodeLabel(sk.node), where = lbl.startsWith('on ') ? lbl : 'near the ' + lbl;
+    return sk.stale ? `Last seen ${where} · ${agoShort(sk.seen)}` : `${sk.statusText || 'On the mountain'} · ${where}`;
+  }
   if (sk.state === 'waiting') return `⏳ Waiting for you at the ${nodeLabel(sk.node)}`;
   if (sk.state === 'idle') return `📍 At the ${nodeLabel(sk.node)}`;
   const e = sk.edge;
@@ -1347,18 +1401,22 @@ function renderFriends(){
     <div class="card friend" data-row="you">${avatar(you)}
       <div><div class="name">You</div><div class="status" data-f="status"></div></div>
       <div class="speed"><b data-f="speed">0</b><small>km/h</small></div></div>
-    <p class="hint">Tap ⌖ to use your GPS when you're at the resort, or 📍 then tap the map to place yourself. Tap any friend to get routes to them.</p>
-    <div class="section-title">Friends on the mountain · ${friends.length}</div>
+    <div class="section-title fr-head"><span>Friends · ${friends.length}</span><button class="linkbtn" data-action="addfriends">${ICON.people} Add friends</button></div>
+    ${friends.length ? '' : `<div class="card empty"><div class="empty-ic">${ICON.people}</div><b>${ui.friendMode === 'none' ? 'Ski with your friends' : 'No friends yet'}</b>
+      <p>${window.skiLinkFriends && skiLinkFriends.available() ? 'Add friends by username or send them an invite link. Only friends you add can see you, and only they show up here and on your leaderboard.' : 'Create an account to add friends. Only friends you add can see you, and only they show up here and on your leaderboard.'}</p>
+      <button class="btn route" data-action="addfriends">Add friends</button></div>`}
     ${friends.map(f => `
       <div class="card friend" data-row="${f.id}">${avatar(f)}
-        <div><div class="name">${f.name} <span class="lvl">${style(f.maxRank).label}</span></div><div class="status" data-f="status"></div></div>
+        <div><div class="name">${f.name} ${f.username ? `<span class="lvl">@${f.username}</span>` : `<span class="lvl">${style(f.maxRank).label}</span>`}</div><div class="status" data-f="status"></div></div>
         <div class="speed"><b data-f="speed">0</b><small>km/h</small></div>
         <div class="actions">
           <button class="btn route grow" data-action="route" data-id="${f.id}">➜ Route to ${f.name}</button>
           <button class="btn" data-action="locate" data-id="${f.id}">◎ Locate</button>
         </div></div>`).join('')}
-    <div class="card democard"><div><b>Demo speed</b><div class="status">Friends are simulated</div></div>
-      <div class="seg">${[1, 5, 20].map(v => `<button data-action="sim" data-v="${v}" class="${ui.sim === v ? 'on' : ''}">${v}×</button>`).join('')}</div></div>`;
+    ${ui.friendMode === 'real' ? '' : `<div class="card democard"><div><b>Demo skiers</b><div class="status">${ui.friendMode === 'demo' ? 'Simulated friends to try routes' : 'Try the app with simulated friends'}</div></div>
+      ${ui.friendMode === 'demo' ? `<div class="seg">${[1, 5, 20].map(v => `<button data-action="sim" data-v="${v}" class="${ui.sim === v ? 'on' : ''}">${v}×</button>`).join('')}</div>` : ''}
+      <button class="switch${ui.friendMode === 'demo' ? ' on' : ''}" data-action="demo" role="switch" aria-checked="${ui.friendMode === 'demo'}" aria-label="Demo skiers"></button></div>`}
+    <p class="hint">Tap ⌖ to use your GPS at the resort, or 📍 then tap the map to place yourself.</p>`;
   updateFriends();
 }
 function updateFriends(){
@@ -1367,7 +1425,7 @@ function updateFriends(){
     row.classList.toggle('sel', ui.selected === sk.id);
     const st = statusHTML(sk) + eleText(sk), sEl = row.querySelector('[data-f=status]');
     if (sEl.innerHTML !== st) sEl.innerHTML = st;
-    row.querySelector('[data-f=speed]').textContent = Math.round(sk.speed * 3.6);
+    row.querySelector('[data-f=speed]').textContent = Math.round((sk.speed || 0) * 3.6);
   });
 }
 
@@ -1388,8 +1446,13 @@ function renderLeaderboard(){
 function updateLeaderboard(){
   const list = document.getElementById('lbList'); if (!list) return;
   const m = METRICS[ui.lbMetric], rows = skiers.slice().sort((a, b) => m.get(b) - m.get(a)), max = m.get(rows[0]) || 1;
+  if (rows.length < 3){
+    document.getElementById('podium').innerHTML = `<div class="card empty" style="grid-column:1/-1"><div class="empty-ic">${ICON.people}</div><b>Compete with your friends</b>
+      <p>Your leaderboard only shows you and the friends you add.</p><button class="btn route" data-action="addfriends">Add friends</button></div>`;
+  } else {
   const pod = (s, i) => `<div class="p${i === 0 ? ' first' : ''}"><span class="medal">${['🥇','🥈','🥉'][i]}</span>${avatar(s)}<b>${m.fmt(m.get(s))}<small style="font-size:11px;font-weight:500;color:var(--muted)"> ${m.unit}</small></b><span>${s.name}</span></div>`;
   document.getElementById('podium').innerHTML = pod(rows[1], 1) + pod(rows[0], 0) + pod(rows[2], 2);
+  }
   list.innerHTML = rows.map((s, i) => `
     <div class="lb-row${s.isYou ? ' me' : ''}"><div class="rank">${i < 3 ? ['🥇','🥈','🥉'][i] : i + 1}</div>${avatar(s, true)}
       <div><div class="name">${s.name}</div><div class="bar"><i style="width:${(m.get(s) / max * 100).toFixed(1)}%;background:${s.color}"></i></div></div>
@@ -1460,6 +1523,7 @@ function renderRoute(){
   let html = `<button class="back" data-action="back">‹ Back</button>
     <div class="route-head">${avatar(f)}<div><h2>${nav ? 'Navigating to' : 'Route to'} ${f.name}</h2><div class="status" id="rStatus"></div></div></div>`;
   if (r && r.error && !nav){
+    if (r.reason){ content.innerHTML = html + `<div class="err">${r.reason}</div>`; return updateRoute(); }
     content.innerHTML = html + `<div class="err">No way to reach the ${nodeLabel(meet)} from your position${G.live && G.live.enforce ? ' using the lifts and runs that are open right now' : ' on the lift & run network'}.</div>`;
     return updateRoute();
   }
@@ -1548,6 +1612,8 @@ content.addEventListener('click', e => {
   else if (a === 'metric'){ ui.lbMetric = b.dataset.m; renderLeaderboard(); }
   else if (a === 'focus') flashEdges(ui.trailGroups[+b.dataset.g].edges);
   else if (a === 'pick') pickOption(+b.dataset.k);
+  else if (a === 'addfriends'){ if (window.skiLinkFriends) skiLinkFriends.open(); }
+  else if (a === 'demo') useDemoFriends(ui.friendMode !== 'demo');
   else if (a === 'sim'){ ui.sim = +b.dataset.v; content.querySelectorAll('[data-action=sim]').forEach(x => x.classList.toggle('on', x === b)); document.querySelectorAll('[data-sim]').forEach(x => x.classList.toggle('on', +x.dataset.sim === ui.sim)); }
   else if (a === 'go') startNav();
   else if (a === 'cancel') stopNav('Navigation ended');
@@ -1714,7 +1780,7 @@ function updateQuick(){
   quick.querySelectorAll('.qf').forEach(b => {
     const sk = byId(b.dataset.q);
     b.classList.toggle('sel', ui.selected === sk.id);
-    b.querySelector('small').textContent = sk.state === 'waiting' ? 'waiting' : sk.state === 'riding' || sk.state === 'queue' ? 'on lift'
+    b.querySelector('small').textContent = sk.real ? (sk.lat == null ? 'not sharing' : sk.stale ? agoShort(sk.seen) : Math.round((sk.speed || 0) * 3.6) + ' km/h') : sk.state === 'waiting' ? 'waiting' : sk.state === 'riding' || sk.state === 'queue' ? 'on lift'
       : sk.state === 'idle' ? 'stopped' : Math.round(sk.speed * 3.6) + ' km/h';
   });
 }
@@ -2096,6 +2162,10 @@ setInterval(() => {
   } else if (ui.tab === 'friends') updateFriends();
   else if (ui.tab === 'leaderboard') updateLeaderboard();
   updateQuick(); updateBanner();
+  if (ui.nav && ui.nav.friend.real && ui.nav.friend.node != null && ui.nav.friend.node !== ui.nav.meet && !ui.nav.friend.offMap){
+    const r2 = dijkstra(you.edge ? you.edge.to : you.node, ui.nav.friend.node, ui.maxRank) || dijkstra(you.edge ? you.edge.to : you.node, ui.nav.friend.node, 5);
+    if (r2){ ui.nav.meet = ui.nav.friend.node; you.navQueue = r2.edges; drawRoute(); ui.routeSig = ''; toast(`${ui.nav.friend.name} moved — route updated`); }
+  }
 }, 500);
 
 // installable + works offline once visited (needs https or localhost)
@@ -2112,5 +2182,6 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 </script>
 <script src="config.js"></script>
 <script src="account.js"></script>
+<script src="friends.js"></script>
 </body>
 </html>

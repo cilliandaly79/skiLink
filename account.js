@@ -72,7 +72,7 @@ const CloudAuth = {
     });
     this.client = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey);
   },
-  wrap(u){ return u ? {email:u.email, profile:Object.assign(blankProfile(), u.user_metadata || {})} : null; },
+  wrap(u){ return u ? {id:u.id, email:u.email, profile:Object.assign(blankProfile(), u.user_metadata || {})} : null; },
   async session(){
     const g = store.get('sk-session'); if (g && g.guest) return {guest:true, profile:g.profile};
     await this.init(); const {data} = await this.client.auth.getSession();
@@ -228,6 +228,7 @@ async function render(){
       <div class="ob-err" id="obErr"></div>
       <form id="obForm" novalidate>
         <label class="ob-field"><span>Display name</span><input name="name" value="${esc(draft.name)}" autocomplete="nickname" maxlength="24" required></label>
+        ${CLOUD && sess && !sess.guest ? `<label class="ob-field"><span>Username — friends use this to find you</span><div class="ob-at"><i>@</i><input name="username" value="${esc((window.skiLinkFriends && skiLinkFriends.me && skiLinkFriends.me.username) || '')}" placeholder="yourname" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20" required></div></label>` : ''}
         <div class="ob-field"><span>Your colour</span><div class="ob-colors">${COLORS.map(c => `<button type="button" data-color="${c}" class="${c === draft.color ? 'on' : ''}" style="background:${c}" aria-label="Colour ${c}"></button>`).join('')}</div></div>
         <div class="ob-field"><span>Your ski level</span><div class="ob-seg">${SKILLS.map(s => `<button type="button" data-skill="${s.k}" class="${s.k === draft.skill ? 'on' : ''}">${s.label}<small>${s.sub}</small></button>`).join('')}</div></div>
         <p class="ob-hint">Used to suggest routes you’ll enjoy. You can still pick any route.</p>
@@ -305,6 +306,11 @@ ob.addEventListener('submit', async e => {
     } else if (step === 'profile'){
       if (!d.name || !d.name.trim()) return err('Please enter a display name.');
       draft.name = d.name.trim(); draft.home = d.home || '';
+      if ('username' in d && window.skiLinkFriends){
+        busy(form, true, 'Checking username…');
+        try { sess.profile = Object.assign({}, sess.profile, {name:draft.name, color:draft.color, skill:draft.skill}); await skiLinkFriends.setUsername(d.username); }
+        catch (x){ busy(form, false, editing ? 'Save' : 'Continue'); return err(/schema cache|does not exist/i.test(x.message) ? 'Usernames aren’t set up on the server yet — you can choose one later in Friends.' : x.message); }
+      }
       if (editing){ editing = false; await saveProfile(draft); hideOnboarding(); applyProfile(); openAccount(); toast('Profile saved'); return; }
       step = 'perms'; render();
     }
@@ -328,6 +334,7 @@ function applyProfile(){
   if (!ui.nav) ui.maxRank = window.PREF_RANK;
   paintButton();
   if (typeof renderQuick === 'function' && G){ renderQuick(); renderPanel(); }
+  dispatchEvent(new CustomEvent('skilink:session'));
 }
 const btn = document.createElement('button');
 btn.className = 'acct-btn'; btn.id = 'acctBtn'; btn.title = 'Your account';
@@ -360,7 +367,9 @@ acct.addEventListener('click', async e => {
   if (pm){ pm.disabled = true; pm.textContent = 'Waiting…'; if (pm.dataset.perm === 'location') await askLocation(); else await askNotifications();
     document.getElementById('acctPerms').innerHTML = await permCards(sess.profile); return; }
   if (e.target.closest('[data-share]')){ await saveProfile(Object.assign({}, sess.profile, {shareLocation:!sess.profile.shareLocation}));
-    document.getElementById('acctPerms').innerHTML = await permCards(sess.profile); return; }
+    document.getElementById('acctPerms').innerHTML = await permCards(sess.profile);
+    dispatchEvent(new CustomEvent('skilink:session'));   // start or stop sharing right away
+    return; }
   const b = e.target.closest('[data-a]'); if (!b) return;
   const a = b.dataset.a;
   if (a === 'close') acct.classList.remove('show');
@@ -389,5 +398,5 @@ addEventListener('keydown', e => { if (e.key === 'Escape') acct.classList.remove
       if (pw && pw.length >= 8) CloudAuth.client.auth.updateUser({password:pw}).then(r => toast(r.error ? r.error.message : 'Password updated')); }
   });
 })();
-window.skiLinkAccount = {get session(){ return sess; }, open:() => sess ? openAccount() : showOnboarding('welcome')};
+window.skiLinkAccount = {get session(){ return sess; }, get client(){ return CloudAuth.client; }, cloud:CLOUD, open:() => sess ? openAccount() : showOnboarding('welcome')};
 })();

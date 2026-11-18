@@ -11,6 +11,7 @@ lift + run routes to meet up (Easiest / Balanced / Fastest), with live open/clos
 |---|---|
 | `index.html` | The whole app (Leaflet map, routing, UI). Installable on phones (PWA). |
 | `account.js`, `account.css`, `config.js` | Sign up / sign in, profile, permissions, account menu |
+| `friends.js`, `supabase/schema.sql` | Friends: requests, invite links, live locations, today's stats |
 | `sw.js`, `manifest.webmanifest`, `icon*` | Offline support + home-screen install |
 | `data/<resort>.json` | Pre-downloaded runs & lifts from OpenStreetMap for the preset resorts |
 | `server.py` | Local dev server: serves the app + live status at `/api/status/<resort>` |
@@ -39,6 +40,19 @@ account menu (edit profile, permissions, sign out, delete).
   Project URL and *anon public* key in `config.js` (Project Settings → API) and push. Sign-up, sign-in,
   password reset and profiles then work through Supabase Auth. In Supabase, set
   Authentication → URL Configuration → Site URL to `https://cilliandaly79.github.io/skiLink/`.
+
+## Friends
+
+Add friends by **username** or an **invite link** (`…/skiLink/?add=yourname`). Only accepted friends
+appear on your map, friend list and leaderboard. Your position is shared with them only while
+*Share my location with friends* is on, and today's stats (top speed, vertical, runs, distance) come
+from your phone's GPS.
+
+**One-time setup:** open Supabase → SQL Editor → New query, paste [`supabase/schema.sql`](supabase/schema.sql)
+and click **Run**. It creates the tables and row-level security rules:
+nobody can list users (exact-username lookup only), and locations/stats are readable only by accepted friends.
+
+Without an account you can switch on **Demo skiers** in the Friends tab to try routes with simulated friends.
 
 ## Live lift & run status
 

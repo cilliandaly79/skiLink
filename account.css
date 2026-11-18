@@ -148,3 +148,29 @@
 .acct-sec{color:var(--label2);letter-spacing:.02em;font-size:13px}
 .acct-btn{border:0;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 @media (prefers-reduced-motion: reduce){ .ob-btn:active{transform:none} .switch::after{transition:none} }
+
+/* ===== friends sheet ===== */
+.ob-at{position:relative}
+.ob-at i{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-style:normal;color:var(--label2);font-size:17px}
+.ob-at input{padding-left:30px}
+.fr-sheet h2{margin-bottom:2px}
+.fr-me{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0}
+.fr-me small{display:block;color:var(--label2);font-size:12.5px}
+.fr-me b{font-size:19px;letter-spacing:-.02em}
+.fr-me .btn svg{width:18px;height:18px}
+.fr-add{display:flex;align-items:center;gap:8px;background:var(--bg2);border-radius:12px;padding:5px 5px 5px 14px}
+.fr-add span{color:var(--label2);font-size:17px}
+.fr-add input{flex:1;min-width:0;border:0;background:none;font:inherit;font-size:17px;color:var(--label);outline:none;padding:8px 0}
+.fr-add .ob-btn{width:auto;margin:0;padding:9px 16px;font-size:15px;border-radius:9px}
+.fr-msg{font-size:13.5px;margin:8px 4px 0;color:var(--label2)}
+.fr-msg.ok{color:var(--green)} .fr-msg.bad{color:var(--red)}
+.fr-list{padding:2px 12px;margin:0}
+.fr-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:.5px solid var(--sep)}
+.fr-row:last-child{border-bottom:0}
+.fr-who b{display:block;font-size:15.5px}
+.fr-who small{color:var(--label2);font-size:12.5px}
+.fr-acts{display:flex;gap:6px}
+.pill{border:0;border-radius:999px;padding:7px 13px;font-weight:600;font-size:13.5px;background:var(--fill);color:var(--tint);transition:transform .16s var(--ease-out)}
+.pill.ok{background:var(--tint);color:#fff}
+.pill:active{transform:scale(.95)}
+.pill:disabled{opacity:.5}
