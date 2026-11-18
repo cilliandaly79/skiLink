@@ -66,7 +66,7 @@ const CloudAuth = {
     if (this.client) return;
     await new Promise((res, rej) => {
       const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js';
       s.onload = res; s.onerror = () => rej(new Error('Can’t reach the sign-in service — check your connection.'));
       document.head.appendChild(s);
     });

@@ -4,6 +4,6 @@
    The anon key is meant to be public — it's safe to commit. Leave both empty to keep
    accounts saved on each device only. */
 window.SKILINK_CONFIG = {
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://vveamlbospmucwcsralo.supabase.co',
+  supabaseAnonKey: 'sb_publishable_Y7swP9FMB3tAgIin5B4aLA_dM-a35QZ',   // publishable (public) key — never put the secret key here
 };
