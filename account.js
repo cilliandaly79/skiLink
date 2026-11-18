@@ -308,8 +308,8 @@ ob.addEventListener('submit', async e => {
 });
 ob.addEventListener('input', e => { if (e.target.name === 'name' && document.getElementById('obAv')) document.getElementById('obAv').textContent = initialsOf(e.target.value); });
 
-function showOnboarding(s){ step = s; render(); ob.classList.add('show'); }
-function hideOnboarding(){ ob.classList.remove('show'); }
+function showOnboarding(s){ step = s; render(); ob.classList.add('show'); document.body.classList.add('ob-open'); }
+function hideOnboarding(){ ob.classList.remove('show'); document.body.classList.remove('ob-open'); if (window.map) setTimeout(() => map.invalidateSize({pan:false}), 50); }
 async function saveProfile(p){ if (!sess) return; sess.profile = Object.assign({}, p); try { await Auth.save(sess, sess.profile); } catch (x){ toast('Couldn’t save your profile: ' + x.message); } }
 
 /* ---------------- apply profile to the app ---------------- */

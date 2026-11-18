@@ -1,5 +1,5 @@
 /* skiLink accounts: onboarding (welcome → sign up / sign in → profile → permissions) + account sheet */
-.ob{position:fixed;inset:0;z-index:4000;display:none;overflow:auto;color:var(--ink);
+.ob{position:fixed;inset:0;z-index:4000;display:none;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;color:var(--ink);
   background:
     radial-gradient(circle at 12% 18%,rgba(255,255,255,.55) 1.6px,transparent 2.4px),
     radial-gradient(circle at 82% 12%,rgba(255,255,255,.5) 1.4px,transparent 2.2px),
