@@ -499,24 +499,42 @@ async function loadOSM(resort){
   throw lastErr;
 }
 
-async function loadElevations(points, cacheKey){
-  // Open-Meteo elevation API (Copernicus DEM, ~90 m), max 100 points per request
-  const cached = cacheGet(cacheKey) || {}, need = points.filter(p => cached[p.id] === undefined);
+async function loadElevations(points, cacheKey, seedKeys = [], quiet = false){
+  // Open-Meteo elevation API (Copernicus DEM, ~90 m), max 100 points per request.
+  // Never blocks for long: if the free service is busy it returns what it has (complete:false).
+  const cached = Object.assign({}, ...seedKeys.map(k => cacheGet(k) || {}), cacheGet(cacheKey) || {});
+  const need = points.filter(p => cached[p.id] === undefined);
   for (let i = 0; i < need.length; i += 100){
-    setLoading('Fetching terrain elevation…', `${Math.min(i + 100, need.length)} / ${need.length} points`);
+    if (!quiet) setLoading('Fetching terrain elevation…', `${Math.min(i + 100, need.length)} / ${need.length} points`);
     const batch = need.slice(i, i + 100);
     const url = `https://api.open-meteo.com/v1/elevation?latitude=${batch.map(p => p.lat.toFixed(5)).join(',')}&longitude=${batch.map(p => p.lon.toFixed(5)).join(',')}`;
-    let r = await fetch(url);
-    if (r.status === 429){   // free tier: per-minute limit — wait it out once
-      setLoading('Fetching terrain elevation…', 'Elevation service busy — retrying in a minute');
-      await new Promise(res => setTimeout(res, 61000)); r = await fetch(url);
-    }
-    if (!r.ok) throw new Error('elevation HTTP ' + r.status);
+    let r;
+    try { r = await fetch(url); } catch { r = null; }
+    if (!r || !r.ok){ cacheSet(cacheKey, cached); return {ele:cached, complete:false}; }
     const j = await r.json();
     batch.forEach((p, k) => cached[p.id] = j.elevation[k]);
+    if (i % 1000 === 0) cacheSet(cacheKey, cached);   // keep progress if the page closes
   }
   cacheSet(cacheKey, cached);
-  return cached;
+  return {ele:cached, complete:true};
+}
+// finish fetching elevation in the background, then rebuild the network with real slopes
+async function refineElevation(token, osm, resort, pts, key, seeds){
+  for (let attempt = 0; attempt < 30; attempt++){
+    await new Promise(r => setTimeout(r, 65000));
+    if (token !== loadToken) return;
+    const res = await loadElevations(pts, key, seeds, true);
+    if (!res.complete) continue;
+    while (ui.nav){ await new Promise(r => setTimeout(r, 10000)); if (token !== loadToken) return; }   // don't disturb navigation
+    if (token !== loadToken) return;
+    G = finishGraph(buildGraph(osm, resort.bbox), res.ele);
+    G.live = null;
+    placeSkiers(); drawNetwork(); renderQuick(); updateMarkers();
+    if (ui.view === 'route' && ui.routeFriend){ ui.route = planRoute(ui.routeFriend); ui.routeSig = ''; drawRoute(); }
+    renderPanel(); refreshStatus(token, true);
+    toast('Terrain loaded — speeds and slopes updated');
+    return;
+  }
 }
 
 /* =========================================================================
@@ -602,7 +620,7 @@ function finishGraph(pre, ele){
     const h = cum[cum.length-1]; if (h < 1) return;
     const ea = E(e.from), eb = E(e.to);
     const dz = ea != null && eb != null ? eb - ea : 0;
-    Object.assign(e, {pts, cum, h, eleA:ea, eleB:eb, length: Math.hypot(h, dz), vert: Math.max(0, -dz), slope: hasEle ? Math.max(0, -dz) / h : 0.2});
+    Object.assign(e, {pts, cum, h, eleA:ea, eleB:eb, length: Math.hypot(h, dz), vert: Math.max(0, -dz), slope: ea != null && eb != null ? Math.max(0, -dz) / h : 0.2});   // unknown height → typical slope
     addNode(e.from); addNode(e.to);
     e.idx = edges.length; edges.push(e);
     if (!out.has(e.from)) out.set(e.from, []); out.get(e.from).push(e);
@@ -1794,10 +1812,12 @@ async function loadResort(resort){
     // elevation is needed only for graph nodes (junctions & ends)
     const ids = new Set();
     pre.ways.forEach(w => w.nodes.forEach((id, i) => { if (pre.split.has(id)) ids.add(id); }));
-    let ele = {};
-    try { ele = await loadElevations([...ids].map(id => ({id, lat: pre.coord.get(id)[0], lon: pre.coord.get(id)[1]})), 'pm-ele-' + (resort.id || resort.bbox.join(','))); }
-    catch (err){ toast('Elevation service unavailable — speeds & vertical are estimates'); }
+    // pass areas reuse elevation already fetched for their member resorts
+    const pts = [...ids].map(id => ({id, lat: pre.coord.get(id)[0], lon: pre.coord.get(id)[1]}));
+    const eleKey = 'pm-ele-' + (resort.id || resort.bbox.join(',')), seeds = (resort.parts || []).map(p => 'pm-ele-' + p);
+    const {ele, complete} = await loadElevations(pts, eleKey, seeds);
     if (token !== loadToken) return;
+    if (!complete){ toast('Map ready — terrain steepness is still loading in the background'); refineElevation(token, osm, resort, pts, eleKey, seeds); }
     G = finishGraph(pre, ele);
     if (!G.mainNodes.length){ setLoading(); toast('Could not build a connected lift/run network here'); return; }
     const name = resort.id ? resort.name : (pre.areas[0] || resort.name);
