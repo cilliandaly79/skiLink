@@ -72,5 +72,13 @@ function phoneState(f, now){
   return null;
 }
 
-return {STALE_MS, metersBetween, createTracker, batteryLevel, phoneState};
+// location sharing: on, paused until a time, or off. profile = {shareLocation, sharePausedUntil(ms)}
+function sharingState(profile, now){
+  const p = profile || {}, t = now || Date.now();
+  if (!p.shareLocation) return {on:false, mode:'off'};
+  if (p.sharePausedUntil && p.sharePausedUntil > t) return {on:false, mode:'paused', until:p.sharePausedUntil};
+  return {on:true, mode:'on'};
+}
+
+return {STALE_MS, metersBetween, createTracker, batteryLevel, phoneState, sharingState};
 });

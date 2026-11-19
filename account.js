@@ -105,7 +105,13 @@ const CloudAuth = {
   },
   async remove(sess){
     if (sess.guest){ store.del('sk-session'); return; }
-    throw new Error('Deleting a cloud account needs the server — ask the skiLink team to remove it.');
+    await this.init();
+    const {error} = await SkiCore.createApi(this.client).deleteAccount();
+    if (error) throw new Error(/could not find|does not exist|schema cache/i.test(error.message)
+      ? 'Account deletion isn’t set up on the server yet (run supabase/schema.sql). Nothing was deleted.'
+      : 'Couldn’t delete your account: ' + error.message);
+    store.del('sk-session');
+    try { await this.client.auth.signOut({scope:'local'}); } catch {}
   },
 };
 const Auth = CLOUD ? CloudAuth : DeviceAuth;
@@ -131,6 +137,11 @@ async function askNotifications(){
 }
 const STATE_TAG = {granted:'<span class="tag ok">Allowed</span>', denied:'<span class="tag no">Blocked</span>',
   prompt:'<span class="tag req">Not set</span>', unsupported:'<span class="tag na">Not available</span>'};
+function shareTag(profile){
+  const st = SkiCore.sharingState(profile);
+  return st.mode === 'on' ? '<span class="tag ok">On</span>' : st.mode === 'paused'
+    ? `<span class="tag req">Paused until ${new Date(st.until).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>` : '<span class="tag na">Off</span>';
+}
 async function permCards(profile){
   const [loc, note] = await Promise.all([permState('location'), permState('notifications')]);
   const btn = (kind, st) => st === 'granted' ? '' : st === 'unsupported' ? '' :
@@ -146,9 +157,9 @@ async function permCards(profile){
       <p>Meet-up progress on your lock screen (“6 min to Maya”), and a ping when you’ve met up.</p>
       <div class="act">${btn('notifications', note)}${note === 'denied' ? blocked : note === 'unsupported' ? '<p class="why" style="color:var(--muted)">On iPhone, add skiLink to your Home Screen first (Share › Add to Home Screen).</p>' : ''}</div></div>
     <div class="perm"><div class="ic" style="--c:var(--green)">${ICON.people}</div>
-      <b>Share my location with friends <span class="tag ${profile.shareLocation ? 'ok' : 'na'}">${profile.shareLocation ? 'On' : 'Off'}</span></b>
+      <b>Share my location with friends ${shareTag(profile)}</b>
       <p>Friends you add can see you on their map, find routes to you and see your phone’s battery level, so they know if it’s about to die. You can turn this off any time.</p>
-      <div class="act"><button class="switch${profile.shareLocation ? ' on' : ''}" data-share aria-label="Share my location with friends" role="switch" aria-checked="${profile.shareLocation}"></button></div></div>`;
+      <div class="act"><button class="switch${SkiCore.sharingState(profile).on ? ' on' : ''}" data-share aria-label="Share my location with friends" role="switch" aria-checked="${SkiCore.sharingState(profile).on}"></button></div></div>`;
 }
 
 /* ---------------- onboarding screens ---------------- */
@@ -180,7 +191,8 @@ async function render(){
     <div class="ob-actions">
       <button class="ob-btn primary" data-go="signup">Create account</button>
       <button class="ob-btn ghost" data-go="signin">Sign in</button>
-      <button class="ob-btn link" data-act="guest">Try it without an account</button></div>`;
+      <button class="ob-btn link" data-act="guest">Try it without an account</button>
+      <p class="ob-legal">By continuing you agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.</p></div>`;
   else if (step === 'signup') h = brand + `<div class="ob-card">${dots(1)}
       <h2>Create your account</h2><p class="lead">It takes about a minute.</p>${deviceNote}
       <div class="ob-err" id="obErr"></div>
@@ -188,7 +200,9 @@ async function render(){
         <label class="ob-field"><span>Your name</span><input name="name" autocomplete="name" value="${esc(draft.name)}" placeholder="e.g. Alex Murphy" required></label>
         <label class="ob-field"><span>Email</span><input name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" required></label>
         <label class="ob-field"><span>Password</span><div class="ob-pw"><input name="password" type="${showPw ? 'text' : 'password'}" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required><button type="button" data-act="pw">${showPw ? 'Hide' : 'Show'}</button></div></label>
-        <label class="ob-check"><input type="checkbox" name="terms"> <span>I agree that skiLink stores my account details and shares my location only with friends I choose. <a href="#" data-act="privacy">How we use your data</a></span></label>
+        <label class="ob-field"><span>Date of birth</span><input name="dob" type="date" autocomplete="bday" max="${new Date().toLocaleDateString('en-CA')}" required></label>
+        <p class="ob-hint" style="margin-top:-6px">Only used to check your age — it isn’t saved.</p>
+        <label class="ob-check"><input type="checkbox" name="terms"> <span>I agree to the <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a> and <a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a>. My location is shared only with friends I choose, and I can delete my account at any time.</span></label>
         <button class="ob-btn primary" type="submit">Create account</button>
       </form>
       <button class="ob-btn link" data-go="signin">Already have an account? Sign in</button>
@@ -215,13 +229,6 @@ async function render(){
   else if (step === 'confirm') h = brand + `<div class="ob-card">
       <h2>Check your email 📬</h2><p class="lead">We sent a confirmation link to <b>${esc(draft.email)}</b>. Tap it, then come back and sign in.</p>
       <button class="ob-btn primary" data-go="signin">I’ve confirmed — sign in</button></div>`;
-  else if (step === 'privacy') h = brand + `<div class="ob-card">
-      <h2>How we use your data</h2>
-      <p class="lead">• <b>Account:</b> your name, email and ski level, so friends recognise you.<br>
-      • <b>Location:</b> used to show you on the map and plan routes. It’s only shared with friends you add, and only if you switch sharing on.<br>
-      • <b>Notifications:</b> only for meet-ups you start.<br>
-      • You can change any of this, sign out or delete your account from the account menu.</p>
-      <button class="ob-btn primary" data-go="signup">Got it</button></div>`;
   else if (step === 'profile') h = brand + `<div class="ob-card">${editing ? '' : dots(2)}
       <h2>${editing ? 'Edit profile' : 'Set up your profile'}</h2><p class="lead">This is how friends see you on the map.</p>
       <div class="ob-avatar" id="obAv" style="background:${draft.color}">${esc(initialsOf(draft.name))}</div>
@@ -248,6 +255,14 @@ async function render(){
 function err(msg){ const e = document.getElementById('obErr'); if (e){ e.textContent = msg; e.classList.add('show'); e.scrollIntoView({block:'nearest'}); } }
 function busy(form, on, label){ const b = form.querySelector('[type=submit]'); if (b){ b.disabled = on; if (label) b.textContent = label; } }
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const MIN_AGE = 16, TERMS_VERSION = '2026-11-19';
+function ageOn(dob, now){   // whole years between a YYYY-MM-DD birth date and today
+  const [y, m, d] = String(dob).split('-').map(Number); if (!y || !m || !d) return null;
+  const t = now || new Date(); let a = t.getFullYear() - y;
+  if (t.getMonth() + 1 < m || (t.getMonth() + 1 === m && t.getDate() < d)) a--;
+  return a;
+}
+const ageBlocked = () => { const t = store.get('sk-age-block'); return t && Date.now() - t < 86400000; };
 
 ob.addEventListener('click', async e => {
   const go = e.target.closest('[data-go]'), act = e.target.closest('[data-act]');
@@ -260,11 +275,10 @@ ob.addEventListener('click', async e => {
   if (pm){ pm.disabled = true; pm.textContent = 'Waiting…';
     if (pm.dataset.perm === 'location') await askLocation(); else await askNotifications();
     document.getElementById('obPerms').innerHTML = await permCards(draft); return; }
-  if (e.target.closest('[data-share]')){ draft.shareLocation = !draft.shareLocation; document.getElementById('obPerms').innerHTML = await permCards(draft); return; }
+  if (e.target.closest('[data-share]')){ draft.shareLocation = !SkiCore.sharingState(draft).on; draft.sharePausedUntil = 0; document.getElementById('obPerms').innerHTML = await permCards(draft); return; }
   if (!act) return;
   const a = act.dataset.act;
   if (a === 'pw'){ showPw = !showPw; const i = ob.querySelector('.ob-pw input'); i.type = showPw ? 'text' : 'password'; act.textContent = showPw ? 'Hide' : 'Show'; }
-  else if (a === 'privacy'){ e.preventDefault(); step = 'privacy'; render(); }
   else if (a === 'guest'){ draft = Object.assign(blankProfile(), {name:'Guest'}); sess = await Auth.guest(draft); step = 'profile'; render(); }
   else if (a === 'cancelEdit'){ editing = false; hideOnboarding(); openAccount(); }
   else if (a === 'finish'){
@@ -285,9 +299,13 @@ ob.addEventListener('submit', async e => {
       if (!d.name || !d.name.trim()) return err('Please enter your name.');
       if (!EMAIL.test(email)) return err('Please enter a valid email address.');
       if ((d.password || '').length < 8) return err('Your password needs at least 8 characters.');
-      if (!d.terms) return err('Please agree to how skiLink uses your data to continue.');
+      if (ageBlocked()) return err(`Sorry — you need to be ${MIN_AGE} or older to create a skiLink account.`);
+      const age = ageOn(d.dob);
+      if (age == null || age > 120) return err('Please enter your date of birth.');
+      if (age < MIN_AGE){ store.set('sk-age-block', Date.now()); return err(`Sorry — you need to be ${MIN_AGE} or older to create a skiLink account.`); }
+      if (!d.terms) return err('Please agree to the Terms of Use and Privacy Policy to continue.');
       busy(form, true, 'Creating account…');
-      draft = Object.assign(blankProfile(), draft, {name:d.name.trim()});
+      draft = Object.assign(blankProfile(), draft, {name:d.name.trim(), ageConfirmed:MIN_AGE, termsAccepted:TERMS_VERSION});
       const r = await Auth.signUp(email, d.password, draft);
       if (r.needsConfirm){ draft.email = email; step = 'confirm'; return render(); }
       sess = r; step = 'profile'; render();
@@ -323,6 +341,15 @@ ob.addEventListener('input', e => { if (e.target.name === 'name' && document.get
 
 function showOnboarding(s){ step = s; render(); ob.classList.add('show'); document.body.classList.add('ob-open'); }
 function hideOnboarding(){ ob.classList.remove('show'); document.body.classList.remove('ob-open'); if (window.map) setTimeout(() => map.invalidateSize({pan:false}), 50); }
+// 'on' | 'off' | 'pause' (minutes) — used by the account sheet and the Friends sheet
+async function setSharing(mode, minutes){
+  if (!sess) return;
+  const patch = mode === 'on' ? {shareLocation:true, sharePausedUntil:0}
+    : mode === 'pause' ? {shareLocation:true, sharePausedUntil:Date.now() + (minutes || 60) * 60000}
+    : {shareLocation:false, sharePausedUntil:0};
+  await saveProfile(Object.assign({}, sess.profile, patch));
+  dispatchEvent(new CustomEvent('skilink:session'));   // start or stop sharing right away
+}
 async function saveProfile(p){ if (!sess) return; sess.profile = Object.assign({}, p); try { await Auth.save(sess, sess.profile); } catch (x){ toast('Couldn’t save your profile: ' + x.message); } }
 
 /* ---------------- apply profile to the app ---------------- */
@@ -357,7 +384,8 @@ async function openAccount(){
     <div class="acct-sec">Account</div>
     ${sess.guest ? '<button class="ob-btn primary" data-a="upgrade">Create an account</button>' : ''}
     <button class="ob-btn ghost" data-a="signout">${sess.guest ? 'Leave guest mode' : 'Sign out'}</button>
-    ${sess.guest || Auth.mode === 'device' ? '<button class="ob-btn danger" data-a="delete">Delete my account & data</button>' : ''}
+    <button class="ob-btn danger" data-a="delete">Delete my account & data</button>
+    <p class="ob-legal"><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms of Use</a></p>
   </div>`;
   acct.classList.add('show');
 }
@@ -366,9 +394,8 @@ acct.addEventListener('click', async e => {
   const pm = e.target.closest('[data-perm]');
   if (pm){ pm.disabled = true; pm.textContent = 'Waiting…'; if (pm.dataset.perm === 'location') await askLocation(); else await askNotifications();
     document.getElementById('acctPerms').innerHTML = await permCards(sess.profile); return; }
-  if (e.target.closest('[data-share]')){ await saveProfile(Object.assign({}, sess.profile, {shareLocation:!sess.profile.shareLocation}));
+  if (e.target.closest('[data-share]')){ await setSharing(SkiCore.sharingState(sess.profile).on ? 'off' : 'on');
     document.getElementById('acctPerms').innerHTML = await permCards(sess.profile);
-    dispatchEvent(new CustomEvent('skilink:session'));   // start or stop sharing right away
     return; }
   const b = e.target.closest('[data-a]'); if (!b) return;
   const a = b.dataset.a;
@@ -379,8 +406,14 @@ acct.addEventListener('click', async e => {
     if (!confirm(sess.guest ? 'Leave guest mode? Your profile on this phone will be cleared.' : 'Sign out of skiLink?')) return;
     await Auth.signOut(); sess = null; draft = blankProfile(); acct.classList.remove('show'); applyProfile(); showOnboarding('welcome');
   } else if (a === 'delete'){
-    if (!confirm('Delete your account and profile from this phone? This can’t be undone.')) return;
-    try { await Auth.remove(sess); } catch (x){ return toast(x.message); }
+    const cloudAcct = !sess.guest && Auth.mode === 'cloud';
+    if (!confirm(cloudAcct
+      ? 'Permanently delete your skiLink account?\n\nThis removes your profile, username, friends and friend requests, shared location, battery and stats from skiLink’s servers. It can’t be undone.'
+      : 'Delete your account and profile from this phone? This can’t be undone.')) return;
+    b.disabled = true; b.textContent = 'Deleting…';
+    try { await Auth.remove(sess); } catch (x){ b.disabled = false; b.textContent = 'Delete my account & data'; return toast(x.message); }
+    if (window.skiLinkFriends) try { skiLinkFriends.stop(); } catch {}
+    ['sk-route-ack', 'sk-geo'].forEach(store.del);
     sess = null; draft = blankProfile(); acct.classList.remove('show'); applyProfile(); showOnboarding('welcome'); toast('Account deleted');
   }
 });
@@ -398,5 +431,5 @@ addEventListener('keydown', e => { if (e.key === 'Escape') acct.classList.remove
       if (pw && pw.length >= 8) CloudAuth.client.auth.updateUser({password:pw}).then(r => toast(r.error ? r.error.message : 'Password updated')); }
   });
 })();
-window.skiLinkAccount = {get session(){ return sess; }, get client(){ return CloudAuth.client; }, cloud:CLOUD, open:() => sess ? openAccount() : showOnboarding('welcome')};
+window.skiLinkAccount = {get session(){ return sess; }, get client(){ return CloudAuth.client; }, cloud:CLOUD, setSharing, open:() => sess ? openAccount() : showOnboarding('welcome')};
 })();

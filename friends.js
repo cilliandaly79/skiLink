@@ -5,6 +5,7 @@
 (() => {
 const acc = () => window.skiLinkAccount;
 const sb = () => acc() && acc().client;
+const sharing = () => SkiCore.sharingState(sess() && sess().profile);   // on / paused / off (core/presence.js)
 const API = () => SkiCore.createApi(sb());   // every database call lives in core/api.js (shared with the native app)
 const sess = () => acc() && acc().session;
 const available = () => !!(sb() && sess() && !sess().guest && sess().id);
@@ -175,7 +176,7 @@ const bat = {level:null, charging:null, ok:false, serverOk:true, lastPush:0};
 const batteryFields = () => bat.ok && bat.serverOk ? {battery:bat.level, charging:bat.charging, battery_at:new Date().toISOString()} : {};
 // battery-only update between position updates (e.g. phone sitting in a pocket), only while sharing
 async function pushBattery(){
-  if (!available() || !bat.ok || !bat.serverOk || !(sess().profile || {}).shareLocation || !gps.lastUpPos) return;
+  if (!available() || !bat.ok || !bat.serverOk || !sharing().on || !gps.lastUpPos) return;
   if (Date.now() - bat.lastPush < 60000 && bat.level > 20) return;
   bat.lastPush = Date.now();
   const {error} = await API().updateBattery(sess().id, batteryFields());
@@ -183,7 +184,7 @@ async function pushBattery(){
 }
 async function upload(here, v){
   if (!available()) return;
-  const share = !!(sess().profile || {}).shareLocation, now = Date.now();
+  const share = sharing().on, now = Date.now();
   if (share && (now - gps.lastUp > 10000 || !gps.lastUpPos || meters(gps.lastUpPos, here) > 30)){
     gps.lastUp = now; gps.lastUpPos = here;
     const status = you.state === 'riding' ? 'Riding a lift' : v > 2 ? 'Skiing' : 'Stopped';
@@ -202,6 +203,7 @@ async function upload(here, v){
 async function stopSharing(){ if (available()) await API().deleteLocation(sess().id); }
 
 /* ---------------- lifecycle ---------------- */
+let pauseTimer = 0;
 async function start(){
   if (!available()){ stop(); return; }
   try {
@@ -215,10 +217,15 @@ async function start(){
   clearInterval(pollTimer); clearInterval(slowTimer);
   pollTimer = setInterval(async () => { if (document.visibilityState !== 'visible') return; try { await loadLive(); syncFriends(); } catch {} }, 15000);
   slowTimer = setInterval(async () => { try { await loadFriendships(); syncFriends(); announce(); if (sheet.classList.contains('show')) render(); } catch {} }, 20000);
-  const prof = sess().profile || {};
-  if (prof.shareLocation && navigator.permissions){
+  const st = sharing();
+  clearTimeout(pauseTimer);
+  if (st.on && navigator.permissions){
     try { if ((await navigator.permissions.query({name:'geolocation'})).state === 'granted') startGps(); } catch { startGps(); }
-  } else if (!prof.shareLocation){ stopSharing(); }
+  } else if (!st.on){
+    gps.lastUpPos = null; stopSharing();          // friends stop seeing you straight away
+    if (st.mode === 'paused') pauseTimer = setTimeout(() => { toast('Location sharing is back on'); start(); }, st.until - Date.now() + 500);
+  }
+  try { if (sheet.classList.contains('show')) render(); } catch {}
   if (pendingAdd){ open(); }
 }
 function stop(){
@@ -250,6 +257,7 @@ function render(){
   const needName = !me || !me.username;
   sheet.innerHTML = `<div class="ob-card fr-sheet"><button class="close" data-f="close" aria-label="Close">✕</button>
     <h2>Friends</h2><p class="lead">Only friends you add can see you, and only they show up on your map and leaderboard.</p>
+    ${shareCard()}
     ${needName ? `<div class="acct-sec">Choose your username</div>
       <form id="frName" class="fr-add"><span>@</span><input name="u" placeholder="yourname" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="20"><button class="ob-btn primary" type="submit">Save</button></form>
       <p class="ob-hint">Friends use this to find you.</p>`
@@ -267,6 +275,17 @@ function render(){
     ${outgoing.length ? `<div class="acct-sec">Sent · waiting for them</div><div class="card fr-list">${outgoing.map(r => row(other(r),
       `<button class="pill" data-f="remove" data-id="${r.id}">Cancel</button>`)).join('')}</div>` : ''}
   </div>`;
+}
+function shareCard(){
+  const st = sharing(), until = st.until && new Date(st.until).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  const head = st.mode === 'on' ? '<b>Sharing your location</b><small>Friends can see you on their map</small>'
+    : st.mode === 'paused' ? `<b>Sharing paused</b><small>Friends can’t see you until ${until}</small>`
+    : '<b>Not sharing your location</b><small>Friends can’t see where you are</small>';
+  const acts = st.mode === 'on'
+    ? '<button class="pill" data-f="pause">Pause 1 hr</button><button class="pill" data-f="share-off">Stop</button>'
+    : st.mode === 'paused' ? '<button class="pill ok" data-f="share-on">Resume</button><button class="pill" data-f="share-off">Stop</button>'
+    : '<button class="pill ok" data-f="share-on">Share</button>';
+  return `<div class="card fr-share ${st.mode}"><span class="dot"></span><div class="fr-who">${head}</div><div class="fr-acts">${acts}</div></div>`;
 }
 async function open(){
   render(); sheet.classList.add('show');
@@ -298,6 +317,11 @@ sheet.addEventListener('submit', async e => {
 });
 sheet.addEventListener('click', async e => {
   if (e.target === sheet) return sheet.classList.remove('show');
+  const sh = e.target.closest('[data-f=pause],[data-f=share-on],[data-f=share-off]');
+  if (sh && acc()){ const f = sh.dataset.f;
+    await acc().setSharing(f === 'pause' ? 'pause' : f === 'share-on' ? 'on' : 'off', 60);
+    toast(f === 'pause' ? 'Location sharing paused for 1 hour' : f === 'share-on' ? 'Sharing your location with friends' : 'Location sharing stopped');
+    return render(); }
   const b = e.target.closest('[data-f]'); if (!b) return;
   const f = b.dataset.f;
   if (f === 'close') sheet.classList.remove('show');
@@ -330,6 +354,6 @@ addEventListener('keydown', e => { if (e.key === 'Escape') sheet.classList.remov
   q.delete('add'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
 })();
 
-window.skiLinkFriends = {available, open, setUsername, get me(){ return me; }, start, stopSharing, startGps, requests, accept, decline};
+window.skiLinkFriends = {available, open, setUsername, get me(){ return me; }, start, stop, stopSharing, startGps, requests, accept, decline};
 start();
 })();

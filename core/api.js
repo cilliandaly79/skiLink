@@ -30,6 +30,8 @@ function createApi(sb){
     upsertLocation:  (row) => sb.from('live_locations').upsert({...row, updated_at:now()}),
     updateBattery:   (uid, fields) => sb.from('live_locations').update(fields).eq('user_id', uid),
     deleteLocation:  (uid) => sb.from('live_locations').delete().eq('user_id', uid),
+    // removes the user's profile, friendships, location, stats and sign-in (supabase/schema.sql: delete_my_account)
+    deleteAccount:   () => sb.rpc('delete_my_account'),
     // today's stats
     dayStats:        (ids, day) => sb.from('day_stats').select('*').eq('day', day || today()).in('user_id', ids),
     upsertDayStats:  (uid, s) => sb.from('day_stats').upsert({user_id:uid, day:today(), top_speed:Math.round(s.top * 10) / 10,

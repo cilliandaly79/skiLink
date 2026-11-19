@@ -174,3 +174,14 @@
 .pill.ok{background:var(--tint);color:#fff}
 .pill:active{transform:scale(.95)}
 .pill:disabled{opacity:.5}
+
+.ob-legal{font-size:12px;color:var(--label2);text-align:center;margin:12px 0 0;line-height:1.45}
+.ob-legal a{color:var(--tint)}
+.ob-check a{color:var(--tint)}
+.fr-share{display:flex;align-items:center;gap:10px;margin:0 0 6px}
+.fr-share .dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--label3)}
+.fr-share.on .dot{background:var(--green);box-shadow:0 0 0 4px rgba(52,199,89,.18)}
+.fr-share.paused .dot{background:var(--orange)}
+.fr-share .fr-who small{display:block}
+.fr-share .pill{white-space:nowrap}
+.fr-share .fr-acts{flex:none}

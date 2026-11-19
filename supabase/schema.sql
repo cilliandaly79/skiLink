@@ -82,6 +82,21 @@ language sql stable security definer set search_path = public as $$
   limit 1;
 $$;
 
+-- in-app "Delete my account": removes everything about the signed-in user, then the sign-in itself
+create or replace function public.delete_my_account()
+returns void language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid();
+begin
+  if uid is null then raise exception 'not signed in'; end if;
+  delete from public.live_locations where user_id = uid;
+  delete from public.day_stats      where user_id = uid;
+  delete from public.friendships    where uid in (requester, addressee);
+  delete from public.profiles       where id = uid;
+  delete from auth.users            where id = uid;
+end $$;
+
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
 revoke all on function public.are_friends(uuid, uuid) from public, anon;
 revoke all on function public.has_friendship_row(uuid, uuid) from public, anon;
 revoke all on function public.find_user(text) from public, anon;
