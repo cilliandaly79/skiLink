@@ -4,8 +4,9 @@
    - map tiles you've looked at: cached (up to ~3000), so the map still shows offline
    - weather / elevation: network first, cached copy if offline
    Bump VERSION when index.html changes so phones pick up the new app. */
-const VERSION = 'pistemap-v11';
-const SHELL = ['./', 'index.html', 'account.js', 'account.css', 'friends.js', 'config.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
+const VERSION = 'pistemap-v12';
+const SHELL = ['./', 'index.html', 'account.js', 'account.css', 'friends.js', 'config.js',
+  'core/theme.js', 'core/resorts.js', 'core/graph.js', 'core/status.js', 'core/presence.js', 'core/api.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'];
 const TILE_HOSTS = ['tile.opentopomap.org', 'server.arcgisonline.com'];

@@ -5,11 +5,16 @@ lift + run routes to meet up (Easiest / Balanced / Fastest), with live open/clos
 
 **Live app:** https://cilliandaly79.github.io/skiLink/ — open it on your phone and choose *Add to Home Screen*.
 
+> **End goal: a native iPhone & Android app.** This web app is the prototype. Shared logic lives in
+> [`core/`](core/) and moves to the native app unchanged — see [docs/native-app.md](docs/native-app.md)
+> for the plan and the rules every new feature follows.
+
 ## What's in here
 
 | Path | What it is |
 |---|---|
-| `index.html` | The whole app (Leaflet map, routing, UI). Installable on phones (PWA). |
+| `core/` | **Shared logic for web + native**: resorts, trail network & routing, lift-status matching, GPS stats & phone warnings, Supabase queries, design tokens |
+| `index.html` | Web app UI (Leaflet map, sheet, screens) built on `core/`. Installable on phones (PWA). |
 | `account.js`, `account.css`, `config.js` | Sign up / sign in, profile, permissions, account menu |
 | `friends.js`, `supabase/schema.sql` | Friends: requests, invite links, live locations, today's stats |
 | `sw.js`, `manifest.webmanifest`, `icon*` | Offline support + home-screen install |

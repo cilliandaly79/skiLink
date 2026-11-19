@@ -5,6 +5,7 @@
 (() => {
 const acc = () => window.skiLinkAccount;
 const sb = () => acc() && acc().client;
+const API = () => SkiCore.createApi(sb());   // every database call lives in core/api.js (shared with the native app)
 const sess = () => acc() && acc().session;
 const available = () => !!(sb() && sess() && !sess().guest && sess().id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
@@ -17,7 +18,7 @@ const cleanUser = u => /^[a-z0-9_.]{3,20}$/.test(u || '') ? u : '';
 const cleanPerson = p => ({...p, display_name:cleanText(p.display_name, 40), username:cleanUser(p.username), color:cleanColor(p.color)});
 const USERNAME = /^[a-z0-9_.]{3,20}$/;
 const today = () => new Date().toLocaleDateString('en-CA');        // YYYY-MM-DD, local day
-const STALE_MS = 10 * 60 * 1000;
+const STALE_MS = SkiCore.STALE_MS;
 
 let me = null, rows = [], people = new Map(), locs = new Map(), stats = new Map();
 let pollTimer = null, slowTimer = null, started = false, pendingAdd = null;
@@ -25,14 +26,14 @@ let pollTimer = null, slowTimer = null, started = false, pendingAdd = null;
 /* ---------------- data ---------------- */
 async function ensureProfile(){
   const s = sess(), p = s.profile || {};
-  const {data, error} = await sb().from('profiles').select('*').eq('id', s.id).maybeSingle();
+  const {data, error} = await API().getProfile(s.id);
   if (error) throw error;
   const want = {display_name:p.name || '', color:p.color || '#007aff', skill:p.skill || 'intermediate'};
   if (!data){
-    const {data:ins, error:e2} = await sb().from('profiles').insert({id:s.id, ...want}).select().single();
+    const {data:ins, error:e2} = await API().insertProfile(s.id, want);
     if (e2) throw e2; me = ins;
   } else if (data.display_name !== want.display_name || data.color !== want.color || data.skill !== want.skill){
-    const {data:up} = await sb().from('profiles').update({...want, updated_at:new Date().toISOString()}).eq('id', s.id).select().single();
+    const {data:up} = await API().updateProfile(s.id, want);
     me = up || data;
   } else me = data;
   return me;
@@ -42,17 +43,17 @@ async function setUsername(raw){
   if (!USERNAME.test(u)) throw new Error('Usernames are 3–20 characters: letters, numbers, dots or underscores.');
   if (!me) await ensureProfile();
   if (me.username === u) return u;
-  const {data, error} = await sb().from('profiles').update({username:u, updated_at:new Date().toISOString()}).eq('id', sess().id).select().single();
+  const {data, error} = await API().updateProfile(sess().id, {username:u});
   if (error) throw new Error(error.code === '23505' ? `@${u} is taken — try another.` : error.message);
   me = data; return u;
 }
 async function loadFriendships(){
-  const {data, error} = await sb().from('friendships').select('*').order('created_at', {ascending:false});
+  const {data, error} = await API().listFriendships();
   if (error) throw error;
   rows = data || [];
   const ids = [...new Set(rows.flatMap(r => [r.requester, r.addressee]))].filter(id => id !== sess().id);
   if (ids.length){
-    const {data:ps} = await sb().from('profiles').select('id,username,display_name,color,skill').in('id', ids);
+    const {data:ps} = await API().profilesByIds(ids);
     (ps || []).forEach(p => people.set(p.id, cleanPerson(p)));
   }
 }
@@ -78,12 +79,12 @@ function requests(){
           outgoing:rows.filter(r => r.status === 'pending' && r.requester === uid).map(wrap)};
 }
 async function accept(id){
-  const {error} = await sb().from('friendships').update({status:'accepted'}).eq('id', +id);
+  const {error} = await API().acceptRequest(id);
   if (error) throw error;
   await loadFriendships(); await loadLive(); syncFriends(); announce();
 }
 async function decline(id){
-  const {error} = await sb().from('friendships').delete().eq('id', +id);
+  const {error} = await API().removeFriendship(id);
   if (error) throw error;
   await loadFriendships(); await loadLive(); syncFriends(); announce();
 }
@@ -92,14 +93,14 @@ async function loadLive(){
   const ids = friendIds();
   locs = new Map(); stats = new Map();
   if (ids.length){
-    const {data} = await sb().from('live_locations').select('*').in('user_id', ids);
+    const {data} = await API().liveLocations(ids);
     (data || []).forEach(l => locs.set(l.user_id, l));
   }
-  const {data:st} = await sb().from('day_stats').select('*').eq('day', today()).in('user_id', [...ids, sess().id]);
+  const {data:st} = await API().dayStats([...ids, sess().id]);
   (st || []).forEach(x => stats.set(x.user_id, x));
   const mine = stats.get(sess().id);
   if (mine && !gps.loadedToday){ gps.loadedToday = true;   // carry on today's stats from another device/session
-    Object.assign(gps.stats, {top:Math.max(gps.stats.top, mine.top_speed), vert:Math.max(gps.stats.vert, mine.vertical), runs:Math.max(gps.stats.runs, mine.runs), dist:Math.max(gps.stats.dist, mine.distance)});
+    tracker.merge({top:mine.top_speed, vert:mine.vertical, runs:mine.runs, dist:mine.distance});
     applyMyStats(); }
 }
 
@@ -130,8 +131,10 @@ function syncFriends(){
 }
 
 /* ---------------- your GPS: position, speed, today's stats ---------------- */
-const gps = {watch:null, last:null, lastUp:0, lastUpPos:null, lastStats:0, low:null, runDrop:0, stats:{top:0, vert:0, runs:0, dist:0}, loadedToday:false};
-const meters = (a, b) => { const k = Math.cos(a.lat * Math.PI / 180); return Math.hypot(a.lat - b.lat, (a.lon - b.lon) * k) * 111320; };
+// the stats maths lives in core/presence.js (shared with the native app); this file only wires it to the browser
+const tracker = SkiCore.createTracker();
+const gps = {watch:null, lastUp:0, lastUpPos:null, lastStats:0, stats:tracker.stats, loadedToday:false};
+const meters = SkiCore.metersBetween;
 function applyMyStats(){ you.realStats = true; you.stats = {top:gps.stats.top, vert:gps.stats.vert, runs:gps.stats.runs, dist:gps.stats.dist}; }
 function startGps(){
   if (gps.watch != null || !('geolocation' in navigator)) return;
@@ -140,23 +143,9 @@ function startGps(){
 function stopGps(){ if (gps.watch != null){ navigator.geolocation.clearWatch(gps.watch); gps.watch = null; } }
 function onPos(p){
   const c = p.coords, here = {lat:c.latitude, lon:c.longitude, alt:c.altitude, t:p.timestamp};
-  if (c.accuracy > 60) return;                                                  // ignore poor fixes (cliffs, gondola cabins)
-  let v = c.speed;
-  if ((v == null || isNaN(v)) && gps.last) v = meters(gps.last, here) / Math.max(1, (here.t - gps.last.t) / 1000);
-  v = v || 0;
-  if (gps.last && v < 45){                                                      // ignore >160 km/h glitches
-    const d = meters(gps.last, here);
-    if (v > 1.5) gps.stats.dist += d;
-    if (here.alt != null && gps.last.alt != null){
-      const dz = gps.last.alt - here.alt;
-      if (dz > 0 && v > 2){ gps.stats.vert += dz; gps.runDrop += dz; }
-      // a run = a descent of 100 m+ followed by going back up (a lift)
-      gps.low = gps.low == null ? here.alt : Math.min(gps.low, here.alt);
-      if (here.alt - gps.low > 40 && gps.runDrop > 100){ gps.stats.runs++; gps.runDrop = 0; gps.low = here.alt; }
-    }
-    gps.stats.top = Math.max(gps.stats.top, v * 3.6);
-  }
-  gps.last = here;
+  const r = tracker.update({...here, speed:c.speed, accuracy:c.accuracy});
+  if (!r) return;
+  const v = r.speed;
   applyMyStats();
   you.speed = v;
   if (G){
@@ -189,7 +178,7 @@ async function pushBattery(){
   if (!available() || !bat.ok || !bat.serverOk || !(sess().profile || {}).shareLocation || !gps.lastUpPos) return;
   if (Date.now() - bat.lastPush < 60000 && bat.level > 20) return;
   bat.lastPush = Date.now();
-  const {error} = await sb().from('live_locations').update(batteryFields()).eq('user_id', sess().id);
+  const {error} = await API().updateBattery(sess().id, batteryFields());
   if (error && /battery|charging/i.test(error.message)) bat.serverOk = false;
 }
 async function upload(here, v){
@@ -199,19 +188,18 @@ async function upload(here, v){
     gps.lastUp = now; gps.lastUpPos = here;
     const status = you.state === 'riding' ? 'Riding a lift' : v > 2 ? 'Skiing' : 'Stopped';
     const row = {user_id:sess().id, lat:here.lat, lon:here.lon, speed_kmh:Math.round(v * 36) / 10,
-      altitude:here.alt, status, resort:(currentResort && currentResort.id) || null, updated_at:new Date().toISOString()};
-    let {error} = await sb().from('live_locations').upsert({...row, ...batteryFields()});
+      altitude:here.alt, status, resort:(currentResort && currentResort.id) || null};
+    let {error} = await API().upsertLocation({...row, ...batteryFields()});
     // server without the battery columns yet (schema.sql not re-run): keep sharing location without it
-    if (error && /battery|charging/i.test(error.message)){ bat.serverOk = false; ({error} = await sb().from('live_locations').upsert(row)); }
+    if (error && /battery|charging/i.test(error.message)){ bat.serverOk = false; ({error} = await API().upsertLocation(row)); }
     if (!error && bat.ok) bat.lastPush = now;
   }
   if (now - gps.lastStats > 60000){
     gps.lastStats = now;
-    await sb().from('day_stats').upsert({user_id:sess().id, day:today(), top_speed:Math.round(gps.stats.top * 10) / 10,
-      vertical:Math.round(gps.stats.vert), runs:gps.stats.runs, distance:Math.round(gps.stats.dist), updated_at:new Date().toISOString()});
+    await API().upsertDayStats(sess().id, gps.stats);
   }
 }
-async function stopSharing(){ if (available()) await sb().from('live_locations').delete().eq('user_id', sess().id); }
+async function stopSharing(){ if (available()) await API().deleteLocation(sess().id); }
 
 /* ---------------- lifecycle ---------------- */
 async function start(){
@@ -290,14 +278,14 @@ async function addByName(raw){
   const u = String(raw || '').trim().toLowerCase().replace(/^@/, '');
   if (!USERNAME.test(u)) return say('Usernames are 3–20 letters, numbers, dots or underscores.', 'bad');
   if (me && u === me.username) return say('That’s you!', 'bad');
-  const {data, error} = await sb().rpc('find_user', {uname:u});
+  const {data, error} = await API().findUser(u);
   if (error) return say(error.message, 'bad');
   const p = data && data[0] && cleanPerson(data[0]);
   if (!p) return say(`No skier called @${u}. Check the spelling, or send them your invite link.`, 'bad');
   people.set(p.id, p);
   const existing = rows.find(r => (r.requester === p.id || r.addressee === p.id));
   if (existing) return say(existing.status === 'accepted' ? `You’re already friends with ${p.display_name || '@' + u}.` : `There’s already a request between you and @${u}.`, '');
-  const {error:e2} = await sb().from('friendships').insert({requester:sess().id, addressee:p.id});
+  const {error:e2} = await API().sendRequest(sess().id, p.id);
   if (e2) return say(e2.message, 'bad');
   await loadFriendships(); announce();
   say(`Request sent to ${p.display_name || '@' + u}. They’ll appear once they accept.`, 'ok');
@@ -321,13 +309,13 @@ sheet.addEventListener('click', async e => {
     try { await navigator.clipboard.writeText(url); toast('Invite link copied'); } catch { prompt('Copy your invite link:', url); }
   } else if (f === 'accept'){
     b.disabled = true;
-    const {error} = await sb().from('friendships').update({status:'accepted'}).eq('id', +b.dataset.id);
+    const {error} = await API().acceptRequest(b.dataset.id);
     if (error) return say(error.message, 'bad');
     await loadFriendships(); await loadLive(); syncFriends(); announce(); say('Friend added', 'ok');
   } else if (f === 'remove'){
     if (b.dataset.name && !confirm(`Remove ${b.dataset.name} from your friends? You’ll stop seeing each other.`)) return;
     b.disabled = true;
-    const {error} = await sb().from('friendships').delete().eq('id', +b.dataset.id);
+    const {error} = await API().removeFriendship(b.dataset.id);
     if (error) return say(error.message, 'bad');
     await loadFriendships(); await loadLive(); syncFriends(); announce(); say('', '');
   }

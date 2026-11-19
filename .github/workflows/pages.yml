@@ -37,7 +37,7 @@ jobs:
       - name: Assemble site
         run: |
           mkdir -p _site
-          cp -r index.html account.js account.css friends.js config.js sw.js manifest.webmanifest icon.svg icon-*.png data status _site/
+          cp -r index.html account.js account.css friends.js config.js core sw.js manifest.webmanifest icon.svg icon-*.png data status _site/
           touch _site/.nojekyll
 
       - uses: actions/configure-pages@v5

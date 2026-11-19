@@ -17,27 +17,14 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="account.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="core/theme.js"></script>
+<script>document.head.appendChild(Object.assign(document.createElement('style'), {textContent:SkiCore.cssVariables()}));</script>
 <style>
-  /* Apple system palette (light); dark values below. Older names alias the new tokens. */
+  /* colour, shadow and motion tokens come from core/theme.js (shared with the native app); older names alias them */
   :root{
-    --bg:#f2f2f7; --bg2:#ffffff; --bg3:#f2f2f7; --fill:rgba(120,120,128,.12); --fill2:rgba(120,120,128,.2);
-    --label:#000000; --label2:rgba(60,60,67,.62); --label3:rgba(60,60,67,.32); --sep:rgba(60,60,67,.16);
-    --tint:#007aff; --green:#34c759; --red:#ff3b30; --orange:#ff9500; --indigo:#5856d6;
-    --mat:rgba(255,255,255,.74); --mat-solid:rgba(255,255,255,.97); --nav:#1c1c1e;
     --ink:var(--label); --muted:var(--label2); --line:var(--sep); --card:var(--bg2); --ice:var(--fill); --ice2:var(--fill2); --frost:var(--label3);
     --accent:var(--tint); --accent-d:var(--tint); --route:var(--indigo); --glass:var(--mat);
-    --shadow:0 8px 28px rgba(0,0,0,.12); --shadow-s:0 1px 3px rgba(0,0,0,.06);
-    --ease-out:cubic-bezier(.23,1,.32,1); --sheet-ease:cubic-bezier(.32,.72,0,1);
     color-scheme:light dark;
-  }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#000000; --bg2:#1c1c1e; --bg3:#2c2c2e; --fill:rgba(118,118,128,.24); --fill2:rgba(118,118,128,.32);
-      --label:#ffffff; --label2:rgba(235,235,245,.62); --label3:rgba(235,235,245,.3); --sep:rgba(84,84,88,.6);
-      --tint:#0a84ff; --green:#30d158; --red:#ff453a; --orange:#ff9f0a; --indigo:#5e5ce6;
-      --mat:rgba(30,30,30,.72); --mat-solid:rgba(28,28,30,.97); --nav:#2c2c2e;
-      --shadow:0 8px 28px rgba(0,0,0,.5); --shadow-s:0 1px 3px rgba(0,0,0,.4);
-    }
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:#eaf3fa;color:var(--ink);font:15px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,sans-serif;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
@@ -571,84 +558,22 @@
     <div class="pk-list" id="pkList"></div>
   </div>
 </div>
+<script src="core/resorts.js"></script>
+<script src="core/graph.js"></script>
+<script src="core/status.js"></script>
+<script src="core/presence.js"></script>
 <script>
 /* =========================================================================
-   CONFIG
+   CONFIG  (reference data lives in core/resorts.js, shared with the native app)
    ========================================================================= */
-const RESORTS = [   // keep in sync with tools/fetch_resorts.py
-  {id:'zermatt',    name:'Zermatt',               country:'CH', region:'Alps', bbox:[45.920,7.660,46.030,7.800], passes:['matterhorn']},
-  {id:'stanton',    name:'St. Anton am Arlberg',  country:'AT', region:'Alps', bbox:[47.100,10.150,47.170,10.300], passes:['arlberg']},
-  {id:'valthorens', name:'Val Thorens',           country:'FR', region:'Alps', bbox:[45.260,6.530,45.330,6.620], passes:['3vallees']},
-  {id:'verbier',    name:'Verbier',               country:'CH', region:'Alps', bbox:[46.060,7.180,46.130,7.330], passes:['4vallees']},
-  {id:'ischgl',     name:'Ischgl · Samnaun',      country:'AT', region:'Alps', bbox:[46.930,10.250,47.020,10.380]},
-  {id:'solden',     name:'Sölden',                country:'AT', region:'Alps', bbox:[46.900,10.880,46.990,11.030]},
-  {id:'kitzbuehel', name:'Kitzbühel',             country:'AT', region:'Alps', bbox:[47.380,12.300,47.460,12.420], passes:['kitzski']},
-  {id:'courchevel', name:'Courchevel & Méribel',  country:'FR', region:'Alps', bbox:[45.360,6.540,45.440,6.670], passes:['3vallees']},
-  {id:'jackson',    name:'Jackson Hole',          country:'US', region:'Rest of the world', bbox:[43.565,-110.885,43.615,-110.800]},
-  {id:'whistler',   name:'Whistler Blackcomb',    country:'CA', region:'Rest of the world', bbox:[50.030,-123.000,50.130,-122.850]},
-  {id:'vail',       name:'Vail',                  country:'US', region:'Rest of the world', bbox:[39.570,-106.450,39.650,-106.300]},
-  {id:'niseko',     name:'Niseko United',         country:'JP', region:'Rest of the world', bbox:[42.820,140.620,42.890,140.720]},
-];
-// extra data pieces (data/<id>.json) that join resorts into their lift-pass areas
-const PARTS = {
-  '3v-belleville':[45.330,6.480,45.365,6.680], 'arlberg-lech':[47.165,10.050,47.270,10.250],
-  '4v-nendaz':[46.120,7.250,46.210,7.420], 'cervinia':[45.850,7.580,45.950,7.720], 'kitz-south':[47.300,12.300,47.385,12.470],
-};
-// lift-pass areas: one ticket, several linked resorts — loaded as one connected map
-const PASSES = {
-  '3vallees':   {id:'3vallees',   name:'Les 3 Vallées',          pass:'3 Vallées pass',   country:'FR', parts:['courchevel', 'valthorens', '3v-belleville'],
-                 covers:'Courchevel · Méribel · Val Thorens · Les Menuires · Orelle'},
-  'arlberg':    {id:'arlberg',    name:'Ski Arlberg',            pass:'Ski Arlberg pass', country:'AT', parts:['stanton', 'arlberg-lech'],
-                 covers:'St. Anton · St. Christoph · Stuben · Lech · Zürs · Warth-Schröcken'},
-  '4vallees':   {id:'4vallees',   name:'4 Vallées',              pass:'4 Vallées pass',   country:'CH', parts:['verbier', '4v-nendaz'],
-                 covers:'Verbier · La Tzoumaz · Nendaz · Veysonnaz · Thyon'},
-  'matterhorn': {id:'matterhorn', name:'Matterhorn Ski Paradise', pass:'International pass', country:'CH', parts:['zermatt', 'cervinia'],
-                 covers:'Zermatt · Breuil-Cervinia · Valtournenche'},
-  'kitzski':    {id:'kitzski',    name:'KitzSki',                pass:'KitzSki full area', country:'AT', parts:['kitzbuehel', 'kitz-south'],
-                 covers:'Kitzbühel · Kirchberg · Jochberg · Pass Thurn'},
-};
-const partBbox = id => (RESORTS.find(r => r.id === id) || {}).bbox || PARTS[id];
-Object.values(PASSES).forEach(p => {   // pass area = union of its pieces
-  const bs = p.parts.map(partBbox);
-  p.bbox = [Math.min(...bs.map(b => b[0])), Math.min(...bs.map(b => b[1])), Math.max(...bs.map(b => b[2])), Math.max(...bs.map(b => b[3]))];
-  p.region = 'Alps'; p.isPass = true;
-});
-const findArea = id => RESORTS.find(r => r.id === id) || PASSES[id];
-const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+const {RESORTS, PARTS, PASSES, partBbox, findArea, OVERPASS, LIFT_TYPES, RANK, SCHEMES, overpassQuery, liftType} = SkiCore;
 
-// speed m/s, typical line in minutes
-const LIFT_TYPES = {
-  cable_car:{label:'Cable car', speed:8, wait:6}, gondola:{label:'Gondola', speed:5.5, wait:3},
-  mixed_lift:{label:'Chair/gondola', speed:5, wait:2.5}, chair_lift:{label:'Chairlift', speed:4, wait:2},
-  drag_lift:{label:'Drag lift', speed:3, wait:1}, 't-bar':{label:'T-bar', speed:3, wait:1}, 'j-bar':{label:'J-bar', speed:3, wait:1},
-  platter:{label:'Platter', speed:3, wait:1}, rope_tow:{label:'Rope tow', speed:2, wait:0.5}, magic_carpet:{label:'Magic carpet', speed:1, wait:0.5},
-  funicular:{label:'Funicular', speed:8, wait:5}, rack_railway:{label:'Mountain railway', speed:5, wait:8},
-};
-// OSM piste:difficulty -> internal rank
-const RANK = {novice:1, easy:2, intermediate:3, advanced:4, expert:5, freeride:5, extreme:5};
-// North America vs. Europe/rest-of-world colour conventions
-const SCHEMES = {
-  na: {1:{key:'green',label:'Easy',color:'#2a9d58'}, 2:{key:'green',label:'Easy',color:'#2a9d58'}, 3:{key:'blue',label:'Intermediate',color:'#1d6fe0'},
-       4:{key:'black',label:'Advanced',color:'#1b1f24'}, 5:{key:'double',label:'Expert',color:'#1b1f24',dash:'7 5'},
-       levels:[[2,'Easy only'],[3,'Up to blue'],[4,'Up to black'],[5,'Any terrain']]},
-  eu: {1:{key:'green',label:'Beginner',color:'#2a9d58'}, 2:{key:'blue',label:'Easy',color:'#1d6fe0'}, 3:{key:'red',label:'Intermediate',color:'#d62828'},
-       4:{key:'black',label:'Difficult',color:'#1b1f24'}, 5:{key:'free',label:'Freeride',color:'#e76f00',dash:'7 5'},
-       levels:[[2,'Up to blue'],[3,'Up to red'],[4,'Up to black'],[5,'Any terrain']]},
-};
 let SCHEME = SCHEMES.na;
 const style = rank => SCHEME[rank];
 
 /* =========================================================================
    DATA LOADING
    ========================================================================= */
-const overpassQuery = b => `[out:json][timeout:120];(way["piste:type"="downhill"](${b});way["aerialway"](${b});way["railway"="funicular"](${b});way["railway"]["rack"](${b}););out body geom;wr["landuse"="winter_sports"]["name"](${b});out tags center;`;
-// funiculars and cog railways (e.g. Zermatt's Sunnegga & Gornergrat) work like lifts
-function liftType(t){
-  if (LIFT_TYPES[t.aerialway]) return t.aerialway;
-  if (t.railway === 'funicular') return 'funicular';
-  if (t.railway && t.rack && t.rack !== 'no' && !['abandoned', 'disused', 'razed', 'construction', 'platform', 'station'].includes(t.railway)) return 'rack_railway';
-  return null;
-}
 const cacheGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
 const cacheSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 
@@ -729,261 +654,10 @@ async function refineElevation(token, osm, resort, pts, key, seeds){
    ========================================================================= */
 let G = null;
 
-function buildGraph(osm, bbox){
-  const lat0 = (bbox[0] + bbox[2]) / 2, lon0 = (bbox[1] + bbox[3]) / 2;
-  const kx = 111320 * Math.cos(lat0 * Math.PI / 180), ky = 110540;
-  const xy = (lat, lon) => [(lon - lon0) * kx, (lat - lat0) * ky];
-  const coord = new Map(), ways = [], areas = [];
-
-  for (const e of osm.elements){
-    const t = e.tags || {};
-    if (e.type !== 'way' || !e.geometry){ if (t.landuse === 'winter_sports' && t.name) areas.push(t.name); continue; }
-    let kind = null;
-    const nm = t.name || '';
-    if (t.disused === 'yes' || t.abandoned === 'yes' || t.demolished === 'yes' || t['piste:abandoned'] === 'yes' ||
-        /stillgelegt|abgebaut|disused|abandoned|dismantled|désaffecté|dismesso/i.test(nm)) continue;   // decommissioned
-    if (t['piste:type'] === 'downhill' && !t.aerialway){
-      if (t.area === 'yes' || (e.nodes[0] === e.nodes[e.nodes.length-1] && e.nodes.length > 3)) continue; // piste areas
-      kind = 'run';
-    } else if (liftType(t)) kind = 'lift';
-    if (!kind || e.nodes.length < 2) continue;
-    e.nodes.forEach((id, i) => coord.set(id, e.geometry[i]));
-    ways.push({id:e.id, kind, tags:t, ltype: kind === 'lift' ? liftType(t) : null, nodes:e.nodes.slice(), name:t.name || t['piste:name'] || '',
-      rank: kind === 'run' ? (RANK[t['piste:difficulty']] || 3) : 0, unknownDiff: kind === 'run' && !RANK[t['piste:difficulty']]});
-  }
-  if (!ways.length) return null;
-
-  // count how many ways touch each node
-  const uses = new Map();
-  ways.forEach(w => new Set(w.nodes).forEach(id => uses.set(id, (uses.get(id) || 0) + 1)));
-  const split = new Set();
-  uses.forEach((n, id) => { if (n > 1) split.add(id); });
-  ways.forEach(w => { split.add(w.nodes[0]); split.add(w.nodes[w.nodes.length-1]); });
-
-  // snap loose ends to the nearest vertex of another way
-  const CELL = 70, grid = new Map(), cellKey = (x, y) => Math.floor(x / CELL) + ',' + Math.floor(y / CELL);
-  ways.forEach((w, wi) => w.nodes.forEach(id => {
-    const [lat, lon] = coord.get(id), [x, y] = xy(lat, lon), k = cellKey(x, y);
-    if (!grid.has(k)) grid.set(k, []); grid.get(k).push({id, wi, x, y});
-  }));
-  const links = [];
-  ways.forEach((w, wi) => [w.nodes[0], w.nodes[w.nodes.length-1]].forEach(end => {
-    if (uses.get(end) > 1) return;
-    const R = w.kind === 'lift' ? 70 : 40, [x, y] = xy(...coord.get(end));
-    let best = null, bd = R;
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++){
-      for (const v of grid.get((Math.floor(x / CELL) + dx) + ',' + (Math.floor(y / CELL) + dy)) || []){
-        if (v.wi === wi) continue;
-        const d = Math.hypot(v.x - x, v.y - y);
-        if (d < bd){ bd = d; best = v; }
-      }
-    }
-    if (best){ split.add(best.id); links.push([end, best.id, bd]); }
-  }));
-
-  return {ways, coord, split, links, areas, xy, lat0, lon0};
-}
-
-function finishGraph(pre, ele){
-  const {ways, coord, split, links, xy} = pre;
-  const E = (id) => ele[id] ?? null;
-  const hasEle = Object.keys(ele).length > 0;
-
-  // orient each way: runs downhill, lifts uphill
-  ways.forEach(w => {
-    const a = E(w.nodes[0]), b = E(w.nodes[w.nodes.length-1]);
-    if (a == null || b == null) return;
-    if ((w.kind === 'run' && b - a > 15) || (w.kind === 'lift' && a - b > 15)){ w.nodes.reverse(); w.reversed = true; }
-  });
-
-  const edges = [], out = new Map(), inn = new Map(), nodes = new Map();
-  const addNode = id => { if (!nodes.has(id)){ const [lat, lon] = coord.get(id); nodes.set(id, {id, lat, lon, ele: E(id)}); } };
-  const addEdge = e => {
-    const pts = e.ids.map(id => coord.get(id)), cum = [0];
-    for (let i = 1; i < pts.length; i++){ const p = xy(...pts[i-1]), q = xy(...pts[i]); cum.push(cum[i-1] + Math.hypot(q[0]-p[0], q[1]-p[1])); }
-    const h = cum[cum.length-1]; if (h < 1) return;
-    const ea = E(e.from), eb = E(e.to);
-    const dz = ea != null && eb != null ? eb - ea : 0;
-    Object.assign(e, {pts, cum, h, eleA:ea, eleB:eb, length: Math.hypot(h, dz), vert: Math.max(0, -dz), slope: ea != null && eb != null ? Math.max(0, -dz) / h : 0.2});   // unknown height → typical slope
-    addNode(e.from); addNode(e.to);
-    e.idx = edges.length; edges.push(e);
-    if (!out.has(e.from)) out.set(e.from, []); out.get(e.from).push(e);
-    if (!inn.has(e.to)) inn.set(e.to, []); inn.get(e.to).push(e);
-  };
-
-  ways.forEach(w => {
-    const lt = LIFT_TYPES[w.ltype];
-    let speed = 0, wait = 0, label = '';
-    if (w.kind === 'lift'){
-      speed = lt.speed; wait = lt.wait; label = lt.label;
-      if (w.tags.aerialway === 'chair_lift'){ const det = w.tags['aerialway:detachable']; speed = det === 'no' ? 2.3 : det === 'yes' ? 5 : speed; }
-      w.duration = parseDuration(w.tags['aerialway:duration']);
-    }
-    let s = 0;
-    for (let i = 1; i < w.nodes.length; i++){
-      if (split.has(w.nodes[i]) || i === w.nodes.length - 1){
-        addEdge({kind:w.kind, way:w, wayId:w.id, name:w.name, rank:w.rank, from:w.nodes[s], to:w.nodes[i], ids:w.nodes.slice(s, i+1), speed, wait, typeLabel:label});
-        s = i;
-      }
-    }
-  });
-  // lift speed from the tagged ride duration when OSM has it
-  const liftLen = new Map();
-  edges.filter(e => e.kind === 'lift').forEach(e => liftLen.set(e.wayId, (liftLen.get(e.wayId) || 0) + e.length));
-  edges.filter(e => e.kind === 'lift' && e.way.duration).forEach(e => e.speed = Math.min(12, Math.max(1, liftLen.get(e.wayId) / e.way.duration)));
-  // short sections often look flat on a ~90 m elevation model: use the whole run's average steepness too
-  if (hasEle){
-    const agg = new Map();
-    edges.filter(e => e.kind === 'run').forEach(e => { const a = agg.get(e.wayId) || {h:0, v:0}; a.h += e.h; a.v += e.vert; agg.set(e.wayId, a); });
-    edges.filter(e => e.kind === 'run').forEach(e => { const a = agg.get(e.wayId); e.slope = Math.max(e.slope, 0.85 * a.v / Math.max(a.h, 1)); });
-  }
-  // enclosed lifts (cable cars, gondolas, funiculars, trains) can also be ridden down
-  const RIDE_DOWN = new Set(['cable_car', 'gondola', 'mixed_lift', 'funicular', 'rack_railway']);
-  edges.filter(e => e.kind === 'lift' && RIDE_DOWN.has(e.way.ltype)).forEach(e => {
-    addEdge({kind:'lift', down:true, way:e.way, wayId:e.wayId + '-down', name:e.name, rank:0, from:e.to, to:e.from,
-      ids:e.ids.slice().reverse(), speed:e.speed, wait:e.wait / 2, typeLabel:e.typeLabel});
-  });
-  links.forEach(([a, b, d]) => {
-    if (d < 1){ return; }
-    addEdge({kind:'link', from:a, to:b, ids:[a, b], name:'', rank:0});
-    addEdge({kind:'link', from:b, to:a, ids:[b, a], name:'', rank:0});
-  });
-
-  // Sectors that only meet in a village (e.g. Zermatt's valley stations) need a short walk.
-  // Join way endpoints of *different* components that are close and at a similar height.
-  const pre1 = largestSCC([...nodes.keys()], out, inn).comp;
-  const WR = 500, wgrid = new Map(), wk = (x, y) => Math.floor(x / WR) + ',' + Math.floor(y / WR);
-  const outDeg = id => (out.get(id) || []).length, inDeg = id => (inn.get(id) || []).length;
-  const deadEnd = new Set(), source = new Set();
-  nodes.forEach((n, id) => { if (!outDeg(id)) deadEnd.add(id); if (!inDeg(id)) source.add(id); });
-  const ends = [...new Set(ways.flatMap(w => [w.nodes[0], w.nodes[w.nodes.length-1]]))].filter(id => nodes.has(id))
-    .map(id => { const [x, y] = xy(...coord.get(id)); return {id, x, y}; });
-  ends.forEach(p => { const k = wk(p.x, p.y); if (!wgrid.has(k)) wgrid.set(k, []); wgrid.get(k).push(p); });
-  const walked = new Set();
-  // valley stations of different sectors are usually a short walk apart through the village
-  // and any two lift stations close together (e.g. funicular top → gondola bottom) are a quick transfer
-  const liftUp = edges.filter(e => e.kind === 'lift' && !e.down);
-  const valley = new Set(liftUp.map(e => e.from)), stations = new Set(liftUp.flatMap(e => [e.from, e.to]));
-  const VR = 1500, vlist = [...stations].map(id => { const [x, y] = xy(...coord.get(id)); return {id, x, y, valley: valley.has(id)}; });
-  vlist.forEach(p => vlist.forEach(q => {
-    if (p.id >= q.id || pre1.get(p.id) === pre1.get(q.id)) return;
-    const d = Math.hypot(q.x - p.x, q.y - p.y), za = E(p.id), zb = E(q.id);
-    const R = p.valley && q.valley ? VR : 200;
-    if (d > R || d < 1 || (za != null && zb != null && Math.abs(za - zb) > (R === VR ? 80 : 50))) return;
-    [[p.id, q.id], [q.id, p.id]].forEach(([a, b]) => { const k = a + '>' + b; if (!walked.has(k)){ walked.add(k); addEdge({kind:'link', walk:true, from:a, to:b, ids:[a, b], name:'', rank:0}); } });
-  }));
-  ends.forEach(p => {
-    if (!deadEnd.has(p.id) && !source.has(p.id)) return;   // only stranded ends need a walk
-    const bestBy = new Map();
-    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++){
-      for (const q of wgrid.get((Math.floor(p.x / WR) + dx) + ',' + (Math.floor(p.y / WR) + dy)) || []){
-        const c = pre1.get(q.id); if (c === pre1.get(p.id)) continue;
-        const d = Math.hypot(q.x - p.x, q.y - p.y); if (d > WR || d < 1) continue;
-        const za = E(p.id), zb = E(q.id); if (za != null && zb != null && Math.abs(za - zb) > 80) continue;
-        if (!bestBy.has(c) || bestBy.get(c).d > d) bestBy.set(c, {q, d});
-      }
-    }
-    bestBy.forEach(({q}) => {
-      const walk = (a, b) => { const k = a + '>' + b; if (walked.has(k)) return; walked.add(k);
-        addEdge({kind:'link', walk:true, from:a, to:b, ids:[a, b], name:'', rank:0}); };
-      if (deadEnd.has(p.id)) walk(p.id, q.id);   // run ends here → walk on
-      if (source.has(p.id)) walk(q.id, p.id);    // lift station nothing leads to → walk there
-    });
-  });
-
-  // keep the largest strongly-connected component for routing & simulation
-  const {comp, best} = largestSCC([...nodes.keys()], out, inn);
-  edges.forEach(e => { e.main = comp.get(e.from) === best && comp.get(e.to) === best; e.cost = edgeCost(e, 1); });
-  return {edges, out, inn, nodes, ways, hasEle, mainNodes: [...nodes.keys()].filter(id => comp.get(id) === best)};
-}
-
-function parseDuration(v){
-  if (!v) return 0;
-  let m;
-  if ((m = /^(\d+(?:\.\d+)?)$/.exec(v))) return +m[1] * 60;
-  if ((m = /^(\d+):(\d{1,2})$/.exec(v))) return +m[1] * 60 + +m[2];
-  if ((m = /^PT(?:(\d+)M)?(?:(\d+)S)?$/.exec(v))) return (+m[1] || 0) * 60 + (+m[2] || 0);
-  return 0;
-}
-
-function largestSCC(ids, out, inn){
-  const seen = new Set(), order = [];
-  for (const s of ids){
-    if (seen.has(s)) continue;
-    seen.add(s); const st = [[s, 0]];
-    while (st.length){
-      const top = st[st.length-1], es = out.get(top[0]) || [];
-      if (top[1] < es.length){ const t = es[top[1]++].to; if (!seen.has(t)){ seen.add(t); st.push([t, 0]); } }
-      else { order.push(top[0]); st.pop(); }
-    }
-  }
-  const comp = new Map(); let best = -1, bestSize = 0, c = 0;
-  for (let i = order.length - 1; i >= 0; i--){
-    const s = order[i]; if (comp.has(s)) continue;
-    let size = 0; const st = [s]; comp.set(s, c);
-    while (st.length){ const u = st.pop(); size++; for (const e of inn.get(u) || []) if (!comp.has(e.from)){ comp.set(e.from, c); st.push(e.from); } }
-    if (size > bestSize){ bestSize = size; best = c; }
-    c++;
-  }
-  return {comp, best};
-}
-
-/* =========================================================================
-   SPEEDS, ROUTING
-   ========================================================================= */
-// cruising speed on a run depends on its steepness (from DEM) and the skier
-function runSpeed(e, factor){ return Math.min(75, Math.max(12, 18 + 90 * Math.min(e.slope, 0.6))) * factor / 3.6; }
-function edgeCost(e, factor){
-  if (e.kind === 'lift') return e.length / e.speed + (e.wait || 0) * 60;
-  if (e.kind === 'link') return e.walk ? e.h / 1.2 + 30 : e.length / 2 + 5;
-  return e.length / runSpeed(e, factor);
-}
-function heapPush(h, x){ h.push(x); let i = h.length - 1; while (i){ const p = (i - 1) >> 1; if (h[p][0] <= h[i][0]) break; [h[p], h[i]] = [h[i], h[p]]; i = p; } }
-function heapPop(h){
-  const top = h[0], last = h.pop();
-  if (h.length){ h[0] = last; let i = 0; for (;;){ const l = 2*i+1, r = l+1; let m = i;
-    if (l < h.length && h[l][0] < h[m][0]) m = l; if (r < h.length && h[r][0] < h[m][0]) m = r;
-    if (m === i) break; [h[m], h[i]] = [h[i], h[m]]; i = m; } }
-  return top;
-}
-function dijkstra(start, goal, maxRank){
-  const dist = new Map([[start, 0]]), prev = new Map(), h = [[0, start]];
-  while (h.length){
-    const [d, u] = heapPop(h);
-    if (d > dist.get(u)) continue;
-    if (u === goal) break;
-    for (const e of G.out.get(u) || []){
-      if (!e.main || (e.kind === 'run' && e.rank > maxRank) || (e.shut && G.live && G.live.enforce)) continue;
-      const nd = d + e.cost;
-      if (nd < (dist.has(e.to) ? dist.get(e.to) : Infinity)){ dist.set(e.to, nd); prev.set(e.to, e); heapPush(h, [nd, e.to]); }
-    }
-  }
-  if (!dist.has(goal)) return null;
-  const edges = [];
-  for (let n = goal; n !== start; n = prev.get(n).from) edges.unshift(prev.get(n));
-  return {edges, time: dist.get(goal)};
-}
-
-function posAt(e, d){
-  const c = e.cum, hd = Math.max(0, Math.min(e.h, d * e.h / e.length));
-  let lo = 0, hi = c.length - 1;
-  while (hi - lo > 1){ const m = (lo + hi) >> 1; if (c[m] <= hd) lo = m; else hi = m; }
-  const t = (hd - c[lo]) / ((c[hi] - c[lo]) || 1), p = e.pts[lo], q = e.pts[hi];
-  return [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t];
-}
-const eleAt = (e, d) => e.eleA == null ? null : e.eleA + (e.eleB - e.eleA) * Math.min(1, d / e.length);
-
-function nodeLabel(id){
-  const outs = G.out.get(id) || [], ins = G.inn.get(id) || [];
-  const lo = outs.find(e => e.kind === 'lift' && !e.down), li = ins.find(e => e.kind === 'lift' && !e.down);
-  if (lo) return `bottom of ${lo.name || lo.typeLabel}`;
-  if (li) return `top of ${li.name || li.typeLabel}`;
-  const names = [...new Set([...outs, ...ins].filter(e => e.kind === 'run' && e.name).map(e => e.name))];
-  if (names.length >= 2) return `${names[0]} / ${names[1]}`;
-  if (names.length === 1) return `on ${names[0]}`;
-  return 'trail junction';
-}
-const edgeName = e => e.kind === 'link' ? 'short traverse' : e.name || (e.kind === 'lift' ? 'unnamed ' + e.typeLabel.toLowerCase() : 'unnamed run');
+// graph building, speeds and routing live in core/graph.js (shared with the native app)
+const {buildGraph, finishGraph, parseDuration, largestSCC, runSpeed, edgeCost, posAt, eleAt, edgeName, buildSteps} = SkiCore;
+const dijkstra = (start, goal, maxRank) => SkiCore.dijkstra(G, start, goal, maxRank);
+const nodeLabel = id => SkiCore.nodeLabel(G, id);
 
 /* =========================================================================
    SKIERS (simulated friends — the real app would stream GPS positions)
@@ -1385,7 +1059,7 @@ const avatar = (sk, sm) => `<div class="avatar${sm ? ' sm' : ''}" style="backgro
 // battery: green ok, orange low, red critical; bolt when charging
 function batteryChip(sk){
   if (sk.battery == null) return '';
-  const b = sk.battery, cls = sk.charging ? 'chg' : b <= 15 ? 'crit' : b <= 30 ? 'low' : 'ok';
+  const b = sk.battery, cls = SkiCore.batteryLevel(b, sk.charging);
   return `<span class="bat ${cls}" title="Battery ${b}%${sk.charging ? ', charging' : ''}"><svg viewBox="0 0 25 12" width="23" height="11" aria-hidden="true">
     <rect x=".75" y=".75" width="20" height="10.5" rx="3" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1.5"/>
     <rect x="22" y="4" width="2" height="4" rx="1" fill="currentColor" fill-opacity=".5"/>
@@ -1393,16 +1067,14 @@ function batteryChip(sk){
     ${sk.charging ? '<path d="M12 1 8 6.6h3.2l-1.4 4.4 4.6-5.9h-3.2z" fill="currentColor" stroke="var(--bg2)" stroke-width=".9"/>' : ''}</svg>${b}%</span>`;
 }
 // warn when a friend's phone has probably died (low battery, then silence) or gone quiet
-function phoneWarning(sk){
-  if (!sk.real || sk.lat == null || !sk.seen) return null;
-  const quietMin = (Date.now() - sk.seen) / 60000;
-  if (sk.stale && sk.battery != null && sk.battery <= 15 && !sk.charging)
-    return {level:'dead', text:`Phone may have died — ${sk.battery}% when last seen ${agoShort(sk.seen)}`};
-  if (!sk.stale && sk.battery != null && sk.battery <= 10 && !sk.charging)
-    return {level:'dying', text:`Phone nearly dead — ${sk.battery}% battery`};
-  if (quietMin > 30 && sk.battery == null)
-    return {level:'quiet', text:`No updates for ${agoShort(sk.seen).replace(' ago', '')} — phone may be off or out of signal`};
-  return null;
+function phoneWarning(sk){   // rules in core/presence.js; this only words them
+  if (!sk.real) return null;
+  const w = SkiCore.phoneState(sk);
+  if (!w) return null;
+  const text = w.level === 'dead' ? `Phone may have died — ${w.battery}% when last seen ${agoShort(w.seen)}`
+    : w.level === 'dying' ? `Phone nearly dead — ${w.battery}% battery`
+    : `No updates for ${agoShort(w.seen).replace(' ago', '')} — phone may be off or out of signal`;
+  return {level:w.level, text};
 }
 const agoShort = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'now' : m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
 function statusHTML(sk){
@@ -1568,22 +1240,6 @@ function renderTrails(){
     <p class="src">Run &amp; lift data © OpenStreetMap contributors. Coverage and difficulty tags depend on local mappers — ${G.ways.length} ways loaded.</p>`;
 }
 
-function buildSteps(edges){
-  const steps = [];
-  for (const e of edges){
-    const last = steps[steps.length - 1];
-    if (e.kind === 'link' && e.walk && e.h >= 60){
-      if (last && last.kind === 'walk'){ last.time += e.cost; last.len += e.h; }
-      else steps.push({kind:'walk', name:'', time:e.cost, len:e.h, vert:0, rank:0});
-      continue;
-    }
-    if (e.kind === 'link'){ if (last){ last.time += e.cost; last.linkLen = (last.linkLen || 0) + e.length; } else steps.push({kind:'link', name:'', time:e.cost, len:e.length, vert:0, rank:0}); continue; }
-    const key = e.kind + '|' + (e.name || '#' + e.wayId);
-    if (last && last.key === key){ last.time += e.cost; last.len += e.length; last.vert += e.vert; last.rank = Math.max(last.rank, e.rank); continue; }
-    steps.push({key, kind:e.kind, name:edgeName(e) + (e.down ? ' down' : ''), rank:e.rank, time:e.cost, len:e.length, vert:e.vert, typeLabel:e.typeLabel, wait:e.wait, first:e});
-  }
-  return steps;
-}
 
 function renderRoute(){
   const f = ui.routeFriend, r = ui.route, nav = ui.nav;
@@ -1952,45 +1608,7 @@ function updateBanner(){
    ========================================================================= */
 const STATUS_EVERY = 3 * 60 * 1000;
 let statusTimer = null;
-const STOP = new Set(['the', 'de', 'des', 'du', 'la', 'le', 'les', 'di', 'del', 'und', 'and', 'am', 'im', 'nr', 'no']);
-const LIFT_WORDS = /\b(\d*(eub|ksb|kseb|dsb|sb|sl|tb|seb|gb|pb|lsb|kb|stb|ub|tsd|tsf|tc|tk|tph|tlc|ts|fun)|telecabine|telesiege|teleski|telepherique|funiculaire|chairlift|chair|gondola|express|sesselbahn|gondelbahn|seilbahn|schlepplift|kabinenbahn|lift|piste|skiroute|run|slope|ski|route)\b/g;
-const normName = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-  .replace(/ß/g, 'ss').replace(LIFT_WORDS, ' ').replace(/[^a-z0-9]+/g, ' ').trim()
-  .split(' ').filter(t => t && !STOP.has(t));
-// lift codes ("A1", "C30") and section numerals ("I", "II") often appear on only one side
-const isCode = t => /^([a-z]?\d+[a-z]?|i{1,3}|iv|v|vi)$/.test(t);
-function nameScore(a, b){
-  const raw = nameScoreRaw(a, b);
-  const a2 = a.filter(t => !isCode(t)), b2 = b.filter(t => !isCode(t));
-  return (a2.length === a.length && b2.length === b.length) ? raw : Math.max(raw, 0.92 * nameScoreRaw(a2, b2));
-}
-function nameScoreRaw(a, b){
-  if (!a.length || !b.length) return 0;
-  const A = new Set(a), B = new Set(b); let inter = 0; A.forEach(t => { if (B.has(t)) inter++; });
-  let sc = 0.5 * inter / Math.min(A.size, B.size) + 0.5 * inter / Math.max(A.size, B.size);
-  const ja = a.join(''), jb = b.join('');
-  if (ja === jb) return 1;
-  if (ja.length > 4 && jb.length > 4 && (ja.includes(jb) || jb.includes(ja))) sc = Math.max(sc, 0.8);
-  return sc;
-}
-// match each OSM lift/run (by name, or by piste number) to a feed entry
-function matchStatus(items, ways, kind){
-  const cands = items.map(it => ({it, toks: normName(it.name), num: (it.number || (/^(\d{1,3}[a-z]?)\b/i.exec(it.name) || [])[1] || '').toLowerCase()}));
-  let matched = 0;
-  ways.filter(w => w.kind === kind).forEach(w => {
-    const ref = String(w.tags['piste:ref'] || w.tags.ref || '').toLowerCase();
-    const toks = normName(w.name);
-    let best = null, bs = 0;
-    for (const c of cands){
-      let sc = nameScore(toks, c.toks);
-      if (ref && c.num && ref === c.num) sc = Math.max(sc, toks.length ? 0.7 + 0.3 * sc : 0.9);
-      if (sc > bs){ bs = sc; best = c; }
-    }
-    w.live = bs >= 0.6 ? best.it.status : null;
-    if (w.live) matched++;
-  });
-  return matched;
-}
+const {normName, nameScore, matchStatus} = SkiCore;   // core/status.js
 async function refreshStatus(token, quiet){
   const r = currentResort;
   if (!r || !r.id || !G) return;
@@ -2276,6 +1894,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 </script>
 <script src="config.js"></script>
 <script src="account.js"></script>
+<script src="core/api.js"></script>
 <script src="friends.js"></script>
 </body>
 </html>
