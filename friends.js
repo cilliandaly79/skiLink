@@ -118,9 +118,11 @@ function syncFriends(){
       const seen = Date.parse(l.updated_at), speed = (l.speed_kmh || 0) / 3.6;
       Object.assign(f, {lat:+l.lat, lon:+l.lon, alt:l.altitude == null ? null : +l.altitude, speed, seen, stale:Date.now() - seen > STALE_MS, statusText:cleanText(l.status, 30),
         state: /riding|lift/i.test(l.status || '') ? 'riding' : speed > 2 ? 'skiing' : 'idle'});
+      const b = l.battery == null ? null : Math.max(0, Math.min(100, Math.round(+l.battery)));
+      Object.assign(f, {battery:Number.isFinite(b) ? b : null, charging:l.charging === true, batteryAt:l.battery_at ? Date.parse(l.battery_at) : null});
       if (f.stale) f.speed = 0;
       if (G) snapReal(f);
-    } else Object.assign(f, {lat:null, lon:null, speed:0, node:null, state:'idle'});
+    } else Object.assign(f, {lat:null, lon:null, speed:0, node:null, state:'idle', battery:null, charging:false});
     return f;
   });
   const same = list.length === friends.length && list.every((f, i) => friends[i] && friends[i].id === f.id);
@@ -172,14 +174,36 @@ function onPos(p){
   }
   upload(here, v);
 }
+const bat = {level:null, charging:null, ok:false, serverOk:true, lastPush:0};
+(async () => {
+  try {
+    if (!navigator.getBattery) return;
+    const b = await navigator.getBattery();
+    const upd = () => { bat.level = Math.round(b.level * 100); bat.charging = !!b.charging; bat.ok = true; you.battery = bat.level; you.charging = bat.charging; pushBattery(); };
+    b.addEventListener('levelchange', upd); b.addEventListener('chargingchange', upd); upd();
+  } catch {}
+})();
+const batteryFields = () => bat.ok && bat.serverOk ? {battery:bat.level, charging:bat.charging, battery_at:new Date().toISOString()} : {};
+// battery-only update between position updates (e.g. phone sitting in a pocket), only while sharing
+async function pushBattery(){
+  if (!available() || !bat.ok || !bat.serverOk || !(sess().profile || {}).shareLocation || !gps.lastUpPos) return;
+  if (Date.now() - bat.lastPush < 60000 && bat.level > 20) return;
+  bat.lastPush = Date.now();
+  const {error} = await sb().from('live_locations').update(batteryFields()).eq('user_id', sess().id);
+  if (error && /battery|charging/i.test(error.message)) bat.serverOk = false;
+}
 async function upload(here, v){
   if (!available()) return;
   const share = !!(sess().profile || {}).shareLocation, now = Date.now();
   if (share && (now - gps.lastUp > 10000 || !gps.lastUpPos || meters(gps.lastUpPos, here) > 30)){
     gps.lastUp = now; gps.lastUpPos = here;
     const status = you.state === 'riding' ? 'Riding a lift' : v > 2 ? 'Skiing' : 'Stopped';
-    await sb().from('live_locations').upsert({user_id:sess().id, lat:here.lat, lon:here.lon, speed_kmh:Math.round(v * 36) / 10,
-      altitude:here.alt, status, resort:(currentResort && currentResort.id) || null, updated_at:new Date().toISOString()});
+    const row = {user_id:sess().id, lat:here.lat, lon:here.lon, speed_kmh:Math.round(v * 36) / 10,
+      altitude:here.alt, status, resort:(currentResort && currentResort.id) || null, updated_at:new Date().toISOString()};
+    let {error} = await sb().from('live_locations').upsert({...row, ...batteryFields()});
+    // server without the battery columns yet (schema.sql not re-run): keep sharing location without it
+    if (error && /battery|charging/i.test(error.message)){ bat.serverOk = false; ({error} = await sb().from('live_locations').upsert(row)); }
+    if (!error && bat.ok) bat.lastPush = now;
   }
   if (now - gps.lastStats > 60000){
     gps.lastStats = now;

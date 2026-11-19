@@ -40,6 +40,11 @@ create table if not exists public.live_locations (
   updated_at timestamptz not null default now()
 );
 
+-- phone battery (shared with friends on the same terms as location; not available on iPhone browsers)
+alter table public.live_locations add column if not exists battery    smallint check (battery between 0 and 100);
+alter table public.live_locations add column if not exists charging   boolean;
+alter table public.live_locations add column if not exists battery_at timestamptz;
+
 create table if not exists public.day_stats (
   user_id    uuid not null references auth.users(id) on delete cascade,
   day        date not null,

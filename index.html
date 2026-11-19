@@ -260,6 +260,19 @@
   .livedot{width:8px;height:8px;border-radius:50%;background:#fca5a5;display:inline-block}
   .livedot.on{background:#7dffb0;box-shadow:0 0 0 3px rgba(125,255,176,.3)}
   .fr-head{display:flex;align-items:center;justify-content:space-between}
+  .bat{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;margin-left:8px;letter-spacing:0;vertical-align:1px}
+  .bat.ok,.bat.chg{color:var(--green)} .bat.low{color:var(--orange)} .bat.crit{color:var(--red)} .bat.na{color:var(--label3);margin:0;font-size:20px}
+  .warn{font-weight:600}
+  .warn.dead,.warn.dying{color:var(--red)} .warn.quiet{color:var(--orange)}
+  .warn.big{background:color-mix(in srgb,currentColor 12%,transparent);border-radius:12px;padding:10px 12px;margin-bottom:10px;font-size:14px}
+  .fprof{margin:-2px 0 14px}
+  .fp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .fp-cell{background:var(--bg2);border-radius:12px;padding:10px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:62px}
+  .fp-cell b{font-size:17px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .fp-cell small{font-size:11px;color:var(--label2);line-height:1.2}
+  .fp-cell .bat{margin:0;font-size:15px}
+  .fp-note{font-size:12px;color:var(--label2);margin:8px 2px 0}
+  .qf.lowbat small{color:var(--red);font-weight:700}
   .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--red);color:#fff;font-size:11.5px;font-weight:700;letter-spacing:0;vertical-align:1px}
   .linkbtn{border:0;background:none;color:var(--tint);font-weight:600;font-size:14px;text-transform:none;letter-spacing:-.01em;display:inline-flex;align-items:center;gap:6px;padding:4px 0}
   .linkbtn svg{width:18px;height:18px}
@@ -1282,7 +1295,8 @@ function updateMarkers(){
     sk.marker.setLatLng(p);
     if (!sk.isYou){
       const moving = sk.state === 'skiing' && sk.speed > 1;
-      sk.spdEl.textContent = moving ? '· ' + Math.round(sk.speed * 3.6) + ' km/h' : sk.state === 'waiting' ? '· waiting' : '';
+      sk.spdEl.textContent = (moving ? '· ' + Math.round(sk.speed * 3.6) + ' km/h' : sk.state === 'waiting' ? '· waiting' : '')
+        + (sk.real && sk.battery != null && sk.battery <= 20 && !sk.charging ? ` · 🪫${sk.battery}%` : '');
       sk.skEl.classList.toggle('sel', ui.selected === sk.id);
       const g = glyphFor(sk);
       if (g !== sk.glyphKind){ sk.glyphKind = g; sk.glyphEl.innerHTML = GLYPH[g]; }
@@ -1368,10 +1382,34 @@ function diffIcon(rank, s = 14){
 const liftIcon = (s = 14) => `<svg width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 3 15 1"/><path d="M8 2v5"/><path d="M4 7h8v4H4z"/><path d="M4 11v3M12 11v3"/></svg>`;
 const avatar = (sk, sm) => `<div class="avatar${sm ? ' sm' : ''}" style="background:${sk.color}" title="${sk.name}">${sk.isYou ? sk.initials : GLYPH.ski}</div>`;
 
+// battery: green ok, orange low, red critical; bolt when charging
+function batteryChip(sk){
+  if (sk.battery == null) return '';
+  const b = sk.battery, cls = sk.charging ? 'chg' : b <= 15 ? 'crit' : b <= 30 ? 'low' : 'ok';
+  return `<span class="bat ${cls}" title="Battery ${b}%${sk.charging ? ', charging' : ''}"><svg viewBox="0 0 25 12" width="23" height="11" aria-hidden="true">
+    <rect x=".75" y=".75" width="20" height="10.5" rx="3" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width="1.5"/>
+    <rect x="22" y="4" width="2" height="4" rx="1" fill="currentColor" fill-opacity=".5"/>
+    <rect x="2.75" y="2.75" width="${(16 * b / 100).toFixed(1)}" height="6.5" rx="1.6" fill="currentColor"/>
+    ${sk.charging ? '<path d="M12 1 8 6.6h3.2l-1.4 4.4 4.6-5.9h-3.2z" fill="currentColor" stroke="var(--bg2)" stroke-width=".9"/>' : ''}</svg>${b}%</span>`;
+}
+// warn when a friend's phone has probably died (low battery, then silence) or gone quiet
+function phoneWarning(sk){
+  if (!sk.real || sk.lat == null || !sk.seen) return null;
+  const quietMin = (Date.now() - sk.seen) / 60000;
+  if (sk.stale && sk.battery != null && sk.battery <= 15 && !sk.charging)
+    return {level:'dead', text:`Phone may have died — ${sk.battery}% when last seen ${agoShort(sk.seen)}`};
+  if (!sk.stale && sk.battery != null && sk.battery <= 10 && !sk.charging)
+    return {level:'dying', text:`Phone nearly dead — ${sk.battery}% battery`};
+  if (quietMin > 30 && sk.battery == null)
+    return {level:'quiet', text:`No updates for ${agoShort(sk.seen).replace(' ago', '')} — phone may be off or out of signal`};
+  return null;
+}
 const agoShort = t => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'now' : m < 60 ? m + ' min ago' : Math.round(m / 60) + ' h ago'; };
 function statusHTML(sk){
   if (sk.real){
     if (sk.lat == null) return 'Not sharing location';
+    const warn = phoneWarning(sk);
+    if (warn && warn.level !== 'dying') return `<span class="warn ${warn.level}">${warn.text}</span>`;
     if (sk.offMap) return `Not at this resort · ${agoShort(sk.seen)}`;
     const lbl = nodeLabel(sk.node), where = lbl.startsWith('on ') ? lbl : 'near the ' + lbl;
     return sk.stale ? `Last seen ${where} · ${agoShort(sk.seen)}` : `${sk.statusText || 'On the mountain'} · ${where}`;
@@ -1400,7 +1438,7 @@ function renderFriends(){
   content.innerHTML = `
     <div class="section-title">You</div>
     <div class="card friend" data-row="you">${avatar(you)}
-      <div><div class="name">You</div><div class="status" data-f="status"></div></div>
+      <div><div class="name">You<span data-f="bat"></span></div><div class="status" data-f="status"></div></div>
       <div class="speed"><b data-f="speed">0</b><small>km/h</small></div></div>
     ${requestsSection()}
     <div class="section-title fr-head"><span>Friends · ${friends.length}</span><button class="linkbtn" data-action="addfriends">${ICON.people} Add friends</button></div>
@@ -1409,7 +1447,7 @@ function renderFriends(){
       <button class="btn route" data-action="addfriends">Add friends</button></div>`}
     ${friends.map(f => `
       <div class="card friend" data-row="${f.id}">${avatar(f)}
-        <div><div class="name">${f.name} ${f.username ? `<span class="lvl">@${f.username}</span>` : `<span class="lvl">${style(f.maxRank).label}</span>`}</div><div class="status" data-f="status"></div></div>
+        <div><div class="name">${f.name} ${f.username ? `<span class="lvl">@${f.username}</span>` : `<span class="lvl">${style(f.maxRank).label}</span>`}<span data-f="bat"></span></div><div class="status" data-f="status"></div></div>
         <div class="speed"><b data-f="speed">0</b><small>km/h</small></div>
         <div class="actions">
           <button class="btn route grow" data-action="route" data-id="${f.id}">➜ Route to ${f.name}</button>
@@ -1457,6 +1495,7 @@ function updateFriends(){
     const st = statusHTML(sk) + eleText(sk), sEl = row.querySelector('[data-f=status]');
     if (sEl.innerHTML !== st) sEl.innerHTML = st;
     row.querySelector('[data-f=speed]').textContent = Math.round((sk.speed || 0) * 3.6);
+    const bEl = row.querySelector('[data-f=bat]'); if (bEl){ const h = batteryChip(sk); if (bEl.innerHTML !== h) bEl.innerHTML = h; }
   });
 }
 
@@ -1552,7 +1591,8 @@ function renderRoute(){
   ui.routeSig = routeSig();
   const meet = nav ? nav.meet : r.meet;
   let html = `<button class="back" data-action="back">‹ Back</button>
-    <div class="route-head">${avatar(f)}<div><h2>${nav ? 'Navigating to' : 'Route to'} ${f.name}</h2><div class="status" id="rStatus"></div></div></div>`;
+    <div class="route-head">${avatar(f)}<div><h2>${nav ? 'Navigating to' : 'Route to'} ${f.name}</h2><div class="status" id="rStatus"></div></div></div>
+    ${f.real ? `<div class="fprof" id="fProf">${friendProfile(f)}</div>` : ''}`;
   if (r && r.error && !nav){
     if (r.reason){ content.innerHTML = html + `<div class="err">${r.reason}</div>`; return updateRoute(); }
     content.innerHTML = html + `<div class="err">No way to reach the ${nodeLabel(meet)} from your position${G.live && G.live.enforce ? ' using the lifts and runs that are open right now' : ' on the lift & run network'}.</div>`;
@@ -1600,9 +1640,24 @@ function renderRoute(){
   content.innerHTML = html;
   updateRoute();
 }
+function friendProfile(f){
+  const warn = phoneWarning(f);
+  const battery = f.battery != null ? `${batteryChip(f)}<small>${f.charging ? 'Charging' : f.battery <= 15 ? 'Critically low' : f.battery <= 30 ? 'Low' : 'Battery'}${f.batteryAt ? ' · ' + agoShort(f.batteryAt) : ''}</small>`
+    : `<span class="bat na">–</span><small>${f.lat == null ? 'Not sharing' : 'Battery not shared'}</small>`;
+  return `${warn ? `<div class="warn ${warn.level} big">${warn.text}</div>` : ''}
+    <div class="fp-grid">
+      <div class="fp-cell">${battery}</div>
+      <div class="fp-cell"><b>${f.lat == null ? '–' : f.stale ? agoShort(f.seen) : 'Live'}</b><small>${f.lat == null ? 'Location' : f.stale ? 'Last seen' : 'Location'}</small></div>
+      <div class="fp-cell"><b>${Math.round(f.stats.top || 0)}</b><small>Top km/h today</small></div>
+      <div class="fp-cell"><b>${Math.round(f.stats.vert || 0).toLocaleString()}</b><small>Vertical m</small></div>
+    </div>
+    ${f.battery == null && f.lat != null ? '<p class="fp-note">Battery level can’t be read on iPhones — skiLink warns you if they stop updating instead.</p>' : ''}`;
+}
 function updateRoute(){
   const f = ui.routeFriend; if (!f) return;
-  const st = document.getElementById('rStatus'); if (st) st.innerHTML = statusHTML(f) + ` · ${Math.round(f.speed * 3.6)} km/h`;
+  const fp = document.getElementById('fProf'); if (fp && f.real){ const h = friendProfile(f); if (fp.innerHTML !== h) fp.innerHTML = h; }
+  const st = document.getElementById('rStatus');
+  if (st) st.innerHTML = f.real && phoneWarning(f) ? `@${f.username || ''}` : statusHTML(f) + ` · ${Math.round((f.speed || 0) * 3.6)} km/h`;   // the warning banner says the rest
   const yEl = document.getElementById('rYou'); if (!yEl) return;
   const nav = ui.nav, r = ui.route;
   const meet = nav ? nav.meet : r.meet;
@@ -1817,7 +1872,9 @@ function updateQuick(){
   quick.querySelectorAll('.qf').forEach(b => {
     const sk = byId(b.dataset.q);
     b.classList.toggle('sel', ui.selected === sk.id);
-    b.querySelector('small').textContent = sk.real ? (sk.lat == null ? 'not sharing' : sk.stale ? agoShort(sk.seen) : Math.round((sk.speed || 0) * 3.6) + ' km/h') : sk.state === 'waiting' ? 'waiting' : sk.state === 'riding' || sk.state === 'queue' ? 'on lift'
+    const w = sk.real && phoneWarning(sk);
+    b.classList.toggle('lowbat', !!w);
+    b.querySelector('small').textContent = sk.real ? (w && w.level === 'dead' ? 'phone died?' : w && w.level === 'dying' ? sk.battery + '% battery' : sk.lat == null ? 'not sharing' : sk.stale ? agoShort(sk.seen) : Math.round((sk.speed || 0) * 3.6) + ' km/h') : sk.state === 'waiting' ? 'waiting' : sk.state === 'riding' || sk.state === 'queue' ? 'on lift'
       : sk.state === 'idle' ? 'stopped' : Math.round(sk.speed * 3.6) + ' km/h';
   });
 }

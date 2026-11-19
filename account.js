@@ -147,7 +147,7 @@ async function permCards(profile){
       <div class="act">${btn('notifications', note)}${note === 'denied' ? blocked : note === 'unsupported' ? '<p class="why" style="color:var(--muted)">On iPhone, add skiLink to your Home Screen first (Share › Add to Home Screen).</p>' : ''}</div></div>
     <div class="perm"><div class="ic" style="--c:var(--green)">${ICON.people}</div>
       <b>Share my location with friends <span class="tag ${profile.shareLocation ? 'ok' : 'na'}">${profile.shareLocation ? 'On' : 'Off'}</span></b>
-      <p>Friends you add can see you on their map and find routes to you. You can turn this off any time.</p>
+      <p>Friends you add can see you on their map, find routes to you and see your phone’s battery level, so they know if it’s about to die. You can turn this off any time.</p>
       <div class="act"><button class="switch${profile.shareLocation ? ' on' : ''}" data-share aria-label="Share my location with friends" role="switch" aria-checked="${profile.shareLocation}"></button></div></div>`;
 }
 
